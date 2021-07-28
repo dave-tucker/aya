@@ -19,10 +19,34 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+
       - uses: Swatinem/rust-cache@v1
+
+      - name: Install grcov
+        run: cargo install grcov
+
+      - name: Set Environment
+        run: |
+          echo 'RUSTC_BOOTSTRAP=1' >> ${GITHUB_ENV}
+          echo 'RUSTFLAGS="-Zinstrument-coverage"' >> ${GITHUB_ENV}
+          echo 'LLVM_PROFILE_FILE="aya-%p-%m.profraw"' >> ${GITHUB_ENV}
 
       - name: Build
         run: cargo build --verbose
+
+      - name: Coverage
+        run: grcov . -s . --binary-path ./target/debug/ -t lcov --branch --ignore-not-existing -o ./target/debug/coverage.lcov
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./target/debug/coverage.lcov
 
       - name: Run tests
         run: RUST_BACKTRACE=full cargo test --verbose
