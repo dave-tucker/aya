@@ -141,14 +141,14 @@ Programming Language and Aya library to build extended Berkley Packet Filter (eB
 programs.</p>
 <h2 id="who-aya-is-for"><a class="header" href="#who-aya-is-for">Who Aya Is For</a></h2>
 <p>Rust is proving to be a popular systems programming language because of its
-safety features and excellent C interoperatbility. The safety features are less
+safety features and excellent C interoperability. The safety features are less
 important in the context of eBPF as programs often need to read kernel memory, which
 is considered unsafe. However, what Rust combined with Aya does offer is a fast and 
 efficient development experience:</p>
 <ul>
 <li>Cargo for project scaffolding, build, test and debugging</li>
 <li>Generation of Rust bindings to Kernel Headers with Compile-Once, Run-Everywhere (CO-RE) support</li>
-<li>Easy code sharing between userspace and eBPF programs</li>
+<li>Easy code sharing between user-space and eBPF programs</li>
 <li>Fast compile times</li>
 <li>No runtime dependency on LLVM or BCC</li>
 </ul>
@@ -179,7 +179,7 @@ Rust 2018.</li>
 <p>If you are unfamiliar with anything mentioned above or if you want more information about a specific topic mentioned in this book you might find some of these resources helpful.</p>
 <table><thead><tr><th>Topic</th><th>Resource</th><th>Description</th></tr></thead><tbody>
 <tr><td>Rust</td><td><a href="https://doc.rust-lang.org/book/">Rust Book</a></td><td>If you are not yet comfortable with Rust, we highly suggest reading this book.</td></tr>
-<tr><td>eBPF</td><td><a href="https://docs.cilium.io/en/stable/bpf/"></a></td><td>If you are not yet comfortable with eBPF, this guide is excelent.</td></tr>
+<tr><td>eBPF</td><td><a href="https://docs.cilium.io/en/stable/bpf/">Cilium BPF and XDP Reference Guide</a></td><td>If you are not yet comfortable with eBPF, this guide is excellent.</td></tr>
 </tbody></table>
 <h2 id="how-to-use-this-book"><a class="header" href="#how-to-use-this-book">How to Use This Book</a></h2>
 <p>This book generally assumes that you’re reading it front-to-back. Later
@@ -188,7 +188,7 @@ not dig into details on a topic, revisiting the topic in a later chapter.</p>
 <h2 id="source-code"><a class="header" href="#source-code">Source Code</a></h2>
 <p>The source files from which this book is generated can be found on <a href="https://github.com/alessandrod/aya">GitHub</a>.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="ebpf-program-constraints"><a class="header" href="#ebpf-program-constraints">eBPF Program Constraints</a></h1>
-<p>The eBPF Virtual Machine, where our eBPF programs will be run, is a constrianed runtime environment:</p>
+<p>The eBPF Virtual Machine, where our eBPF programs will be run, is a constrained runtime environment:</p>
 <ul>
 <li>There is only 512 bytes of stack (or 256 bytes if we are using tail calls).</li>
 <li>There is no access to heap space and data must instead be written to maps.</li>
@@ -215,12 +215,12 @@ not dig into details on a topic, revisiting the topic in a later chapter.</p>
 and running a simple eBPF program and userspace application.</p>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="development-environment"><a class="header" href="#development-environment">Development Environment</a></h1>
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
-<p>Before getting started you will need the Rust stable and nightly toolchains installed on your system.
+<p>Before getting started you will need the Rust stable and nightly tool-chains installed on your system.
 This is easily achieved with [<code>rustup</code>]:</p>
 <pre><code class="language-console">rustup install stable
 rustup install nightly --component rust-src
 </code></pre>
-<p>Once you have the Rust toolchains installed, you must also install the <code>bpf-linker</code> - for linking our eBPF program - and <code>cargo-generate</code> - for generating the project skeleton.</p>
+<p>Once you have the Rust tool-chains installed, you must also install the <code>bpf-linker</code> - for linking our eBPF program - and <code>cargo-generate</code> - for generating the project skeleton.</p>
 <pre><code class="language-console">cargo +nightly install bpf-linker
 cargo install cargo-generate
 </code></pre>
@@ -229,10 +229,10 @@ cargo install cargo-generate
 <pre><code class="language-console">cargo generate https://github.com/dave-tucker/aya-template
 </code></pre>
 <p>This will prompt you for a project name. We'll be using <code>myapp</code> in this example</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="hello-xdp"><a class="header" href="#hello-xdp">Hello XDP</a></h1>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="hello-xdp"><a class="header" href="#hello-xdp">Hello XDP!</a></h1>
 <h2 id="example-project"><a class="header" href="#example-project">Example Project</a></h2>
-<p>While there are myriad tracepoints to attach to and program types to write we should start somewhere simple.</p>
-<p>XDP (eXpress Data Path) programs permit our eBPF program to make decisions about packets that have been recieved on the interface to which our program is attached. To keep things simple, we'll build a very simplistic firewall to permit or deny traffic.</p>
+<p>While there are myriad trace points to attach to and program types to write we should start somewhere simple.</p>
+<p>XDP (eXpress Data Path) programs permit our eBPF program to make decisions about packets that have been received on the interface to which our program is attached. To keep things simple, we'll build a very simplistic firewall to permit or deny traffic.</p>
 <h2 id="ebpf-component"><a class="header" href="#ebpf-component">eBPF Component</a></h2>
 <h3 id="permit-all"><a class="header" href="#permit-all">Permit All</a></h3>
 <p>We must first write the eBPF component of our program.
@@ -275,7 +275,7 @@ unsafe fn try_xdp_firewall(_ctx: XdpContext) -&gt; Result&lt;u32, c_long&gt; {
 <li>The <code>try_xdp_firewall</code> function returns a Result that permits all traffic</li>
 <li>The <code>xdp_firewall</code> program calls <code>try_xdp_firewall</code> and handles any errors by returning <code>XDP_ABORTED</code>, which will drop the packet and raise a tracepoint exception.</li>
 </ul>
-<p>Now we can complile this using <code>cargo xtask build-ebpf</code></p>
+<p>Now we can compile this using <code>cargo xtask build-ebpf</code></p>
 <h3 id="verifying-the-program"><a class="header" href="#verifying-the-program">Verifying The Program</a></h3>
 <p>Let's take a look at the compiled eBPF program:</p>
 <pre><code class="language-console">$ llvm-objdump -S target/bpfel-unknown-none/debug/myapp
@@ -319,8 +319,8 @@ unsafe fn try_xdp_firewall(_ctx: XdpContext) -&gt; Result&lt;u32, c_long&gt; {
     Ok(xdp_action::XDP_PASS)
 }
 </code></pre>
-<h2 id="userspace-component"><a class="header" href="#userspace-component">Userspace Component</a></h2>
-<p>Now our eBPF program is complete and compiled, we need a userspace program to load it and attach it to a tracepoint.
+<h2 id="user-space-component"><a class="header" href="#user-space-component">User-space Component</a></h2>
+<p>Now our eBPF program is complete and compiled, we need a user-space program to load it and attach it to a trace point.
 Fortunately, we have a program ready in <code>myapp/src/main.rs</code> which is going to do that for us.</p>
 <h3 id="starting-out"><a class="header" href="#starting-out">Starting Out</a></h3>
 <p>The generated application has the following content:</p>
@@ -375,7 +375,7 @@ use std::{
 <li>Opens the file</li>
 <li>Reads the ELF contents</li>
 <li>Creates any maps</li>
-<li>If your sysyem supports BPF Type Format (BTF), it will read the current BTF description and performs any necessary relocations</li>
+<li>If your system supports BPF Type Format (BTF), it will read the current BTF description and performs any necessary relocations</li>
 </ul>
 <p>Once our file is loaded, we can extract the XDP probe with <code>let probe: &amp;mut Xdp = bpf.program_mut(&quot;xdp&quot;)?.try_into()?;</code> and then load it in to the kernel with <code>probe.load()</code>.</p>
 <p>Finally, we can attach it to an interface with <code>probe.attach(&amp;iface, XdpFlags::default())?;</code></p>
@@ -396,7 +396,7 @@ When our program terminates, the file descriptor is closed, the reference count 
         xlated 16B  jited 18B  memlock 4096B
         pids myapp(69184)
 </code></pre>
-<p>For our firewall to work once the userspace program has exited, we'll need to pin it to the BPF FS.</p>
+<p>For our firewall to work once the user-space program has exited, we'll need to pin it to the BPF FS.</p>
 
                     </main>
 
