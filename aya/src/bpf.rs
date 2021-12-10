@@ -1,6 +1,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     error::Error,
     ffi::CString,
     fs, io,
@@ -67,14 +68,33 @@ pub(crate) struct bpf_map_def {
     // optional features
     pub(crate) id: u32,
     pub(crate) pinning: PinningType,
+    pub(crate) btf_key_type_id: Option<u32>,
+    pub(crate) btf_value_type_id: Option<u32>,
 }
 
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum PinningType {
     None = 0,
-    #[allow(dead_code)] // ByName is constructed from the BPF side
     ByName = 1,
+}
+
+#[derive(Debug, Error)]
+pub(crate) enum PinningError {
+    #[error("unsupported pinning type")]
+    Unsupported,
+}
+
+impl TryFrom<u32> for PinningType {
+    type Error = PinningError;
+
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(PinningType::None),
+            1 => Ok(PinningType::ByName),
+            _ => Err(PinningError::Unsupported),
+        }
+    }
 }
 
 impl Default for PinningType {
@@ -340,6 +360,7 @@ impl<'a> BpfLoader<'a> {
                 obj,
                 fd: None,
                 pinned: false,
+                btf_fd,
             };
             let fd = match map.obj.def.pinning {
                 PinningType::ByName => {
@@ -743,6 +764,10 @@ pub enum BpfError {
         /// The original error
         error: Box<dyn Error + Send + Sync>,
     },
+
+    /// No BTF parsed for object
+    #[error("no BTF parsed for object")]
+    NoBTF,
 
     #[error("map error")]
     /// A map error
