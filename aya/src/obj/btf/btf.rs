@@ -156,6 +156,15 @@ pub enum BtfError {
     /// unable to get symbol name
     #[error("Unable to get symbol name")]
     InvalidSymbolName,
+
+    /// BTF Map parse error. Unexpected Type Encountered
+    #[error("map parse error. expected type {expected} but found type {found}")]
+    MapParseUnexpectedType {
+        /// Expected Type
+        expected: String,
+        /// Encountered Type
+        found: String,
+    },
 }
 
 /// Bpf Type Format metadata.
