@@ -2,15 +2,18 @@
     "categories": [
       {
         "title": "## 🚀 Features",
-        "labels": ["feature"]
+        "labels": ["feature"],
+        "exhaustive": true
       },
       {
         "title": "## 🐛 Fixes",
-        "labels": ["fix"]
+        "labels": ["fix"],
+        "exhaustive": true
       },
       {
         "title": "## 🧪 Tests",
-        "labels": ["test"]
+        "labels": ["test"],
+        "exhaustive": true
       }
     ],
     "ignore_labels": [
