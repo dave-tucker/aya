@@ -1,0 +1,28 @@
+{
+    "categories": [
+      {
+        "title": "## 🚀 Features",
+        "labels": ["feature"]
+      },
+      {
+        "title": "## 🐛 Fixes",
+        "labels": ["fix"]
+      },
+      {
+        "title": "## 🧪 Tests",
+        "labels": ["test"]
+      }
+    ],
+    "ignore_labels": [
+      "ignore"
+    ],
+    "tag_resolver": {
+      "filter": {
+        "pattern": "<from-workflow>"
+      },
+      "transformer": {
+        "pattern": "<from-workflow>",
+        "target": "$1"
+      }
+    }
+}
