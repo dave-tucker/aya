@@ -9,5 +9,5 @@ tagPattern="${crate}-v(.+)"
 
 echo ::group::Configuring changelog generator
 jq '.tag_resolver.filter.pattern="'$tagPattern'" | .tag_resolver.transformer.pattern="'$tagPattern'" | .categories[].labels += ["'$crate'"]' \
-  .github/changelog-configuration.json | tee .github/configuration.json
+  .github/changelog-base.json | tee .github/changelog-config.json
 echo ::endgroup::
