@@ -317,6 +317,30 @@ impl Btf {
         Ok(s.to_string_lossy())
     }
 
+    pub(crate) fn replace_string_at(&mut self, offset: u32, value: &str) -> Result<(), BtfError> {
+        let btf_header {
+            hdr_len,
+            mut str_off,
+            str_len,
+            ..
+        } = self.header;
+        str_off += hdr_len;
+
+        let c_str = CString::new(value).unwrap();
+        let new = c_str.as_bytes_with_nul();
+
+        if offset >= str_off + str_len || offset + new.len() as u32 > str_off + str_len {
+            return Err(BtfError::InvalidStringOffset {
+                offset: offset as usize,
+            });
+        }
+
+        let offset = offset as usize;
+        self.strings
+            .splice(offset..offset + new.len(), new.iter().cloned());
+        Ok(())
+    }
+
     pub(crate) fn type_by_id(&self, type_id: u32) -> Result<&BtfType, BtfError> {
         self.types.type_by_id(type_id)
     }
@@ -462,6 +486,13 @@ impl Btf {
                     // Start DataSec Fixups
                     let sec_name = self.string_at(ty.name_off)?;
                     let name = sec_name.to_string();
+
+                    // Handle any "/" characters in section names
+                    // Example: "maps/hashmap"
+                    let fixed_name = str::replace(&name, "/", ".");
+                    if fixed_name != name {
+                        self.replace_string_at(ty.name_off, &fixed_name)?;
+                    }
                     // There are some cases when the compiler does indeed populate the
                     // size
                     if unsafe { ty.__bindgen_anon_1.size > 0 } {
@@ -1106,7 +1137,7 @@ mod tests {
             BTF_VAR_GLOBAL_EXTERN,
         ));
 
-        let name_offset = btf.add_string(".data".to_string());
+        let name_offset = btf.add_string(".data/foo".to_string());
         let variables = vec![btf_var_secinfo {
             type_: var_type_id,
             offset: 0,
@@ -1120,7 +1151,7 @@ mod tests {
         };
 
         btf.fixup_and_sanitize(
-            &HashMap::from([(".data".to_string(), 32u64)]),
+            &HashMap::from([(".data/foo".to_string(), 32u64)]),
             &HashMap::from([("foo".to_string(), 64u64)]),
             &features,
         )
@@ -1135,7 +1166,8 @@ mod tests {
                 sec_info[0].offset == 64,
                 "expected 64, got {}",
                 sec_info[0].offset
-            )
+            );
+            assert!(btf.string_at(name_offset).unwrap() == ".data.foo")
         } else {
             panic!("not a datasec")
         }
