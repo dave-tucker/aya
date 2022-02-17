@@ -1,6 +1,6 @@
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet},
+    collections::{hash_map::RandomState, HashMap, HashSet},
     error::Error,
     ffi::CString,
     fs, io,
@@ -32,7 +32,7 @@ use crate::{
         is_btf_func_supported, is_btf_supported, is_btf_type_tag_supported, is_prog_name_supported,
         retry_with_verifier_logs,
     },
-    util::{bytes_of, possible_cpus, VerifierLog, POSSIBLE_CPUS},
+    util::{bytes_of, get_pinned_path, possible_cpus, PinnedObject, VerifierLog, POSSIBLE_CPUS},
 };
 
 pub(crate) const BPF_OBJ_NAME_LEN: usize = 16;
@@ -147,8 +147,8 @@ impl Features {
 /// let bpf = BpfLoader::new()
 ///     // load the BTF data from /sys/kernel/btf/vmlinux
 ///     .btf(Btf::from_sys_fs().ok().as_ref())
-///     // load pinned maps from /sys/fs/bpf/my-program
-///     .map_pin_path("/sys/fs/bpf/my-program")
+///     // pin to /sys/fs/bpf/my-program
+///     .pin_path("/sys/fs/bpf/my-program")
 ///     // finally load the code
 ///     .load_file("file.o")?;
 /// # Ok::<(), aya::BpfError>(())
@@ -156,7 +156,7 @@ impl Features {
 #[derive(Debug)]
 pub struct BpfLoader<'a> {
     btf: Option<Cow<'a, Btf>>,
-    map_pin_path: Option<PathBuf>,
+    pub(crate) pin_path: PathBuf,
     globals: HashMap<&'a str, &'a [u8]>,
     features: Features,
     extensions: HashSet<&'a str>,
@@ -169,7 +169,7 @@ impl<'a> BpfLoader<'a> {
         features.probe_features();
         BpfLoader {
             btf: Btf::from_sys_fs().ok().map(Cow::Owned),
-            map_pin_path: None,
+            pin_path: PathBuf::from("/sys/fs/bpf"),
             globals: HashMap::new(),
             features,
             extensions: HashSet::new(),
@@ -198,10 +198,13 @@ impl<'a> BpfLoader<'a> {
         self
     }
 
-    /// Sets the base directory path for pinned maps.
+    /// Sets the base directory for BPF object pinning.
     ///
-    /// Pinned maps will be loaded from `path/MAP_NAME`.
-    /// The caller is responsible for ensuring the directory exists.
+    /// To reduce the risk of conflicting names the path on bppfs should be
+    /// unique to your application.
+    ///
+    /// Maps will be pinned on creation only if requested by
+    /// PinningType::PinByName
     ///
     /// # Example
     ///
@@ -209,13 +212,13 @@ impl<'a> BpfLoader<'a> {
     /// use aya::BpfLoader;
     ///
     /// let bpf = BpfLoader::new()
-    ///     .map_pin_path("/sys/fs/bpf/my-program")
+    ///     .pin_path("/sys/fs/bpf/my-program")
     ///     .load_file("file.o")?;
     /// # Ok::<(), aya::BpfError>(())
     /// ```
     ///
-    pub fn map_pin_path<P: AsRef<Path>>(&mut self, path: P) -> &mut BpfLoader<'a> {
-        self.map_pin_path = Some(path.as_ref().to_owned());
+    pub fn pin_path<P: AsRef<Path>>(&mut self, path: P) -> &mut BpfLoader<'a> {
+        self.pin_path = path.as_ref().to_owned();
         self
     }
 
@@ -311,6 +314,11 @@ impl<'a> BpfLoader<'a> {
     /// # Ok::<(), aya::BpfError>(())
     /// ```
     pub fn load(&mut self, data: &[u8]) -> Result<Bpf, BpfError> {
+        fs::create_dir_all(&self.pin_path).map_err(|error| BpfError::DirectoryError {
+            path: self.pin_path.to_path_buf(),
+            error,
+        })?;
+
         let mut obj = Object::parse(data)?;
         obj.patch_map_data(self.globals.clone())?;
 
@@ -345,26 +353,26 @@ impl<'a> BpfLoader<'a> {
                     })?
                     .len() as u32;
             }
+            let pin_path =
+                get_pinned_path(&self.pin_path, PinnedObject::Map { name: name.clone() });
             let mut map = Map {
                 obj,
                 fd: None,
+                name: name.clone(),
                 pinned: false,
+                pin_path,
             };
             let fd = match map.obj.def.pinning {
                 PinningType::ByName => {
-                    let path = match &self.map_pin_path {
-                        Some(p) => p,
-                        None => return Err(BpfError::NoPinPath),
-                    };
                     // try to open map in case it's already pinned
-                    match map.open_pinned(&name, path) {
+                    match map.open_pinned() {
                         Ok(fd) => {
                             map.pinned = true;
                             fd as RawFd
                         }
                         Err(_) => {
                             let fd = map.create(&name)?;
-                            map.pin(&name, path)?;
+                            map.pin()?;
                             fd
                         }
                     }
@@ -372,6 +380,7 @@ impl<'a> BpfLoader<'a> {
                 PinningType::None => map.create(&name)?,
             };
             if !map.obj.data.is_empty() && map.obj.kind != MapKind::Bss {
+                debug!("calling bpf_map_update_elem_ptr: {:#?}", map.obj.data);
                 bpf_map_update_elem_ptr(fd, &0 as *const _, map.obj.data.as_mut_ptr(), 0).map_err(
                     |(code, io_error)| MapError::SyscallError {
                         call: "bpf_map_update_elem".to_owned(),
@@ -393,17 +402,14 @@ impl<'a> BpfLoader<'a> {
         obj.relocate_maps(maps.iter().map(|(name, map)| (name.as_str(), map)))?;
         obj.relocate_calls()?;
 
-        let programs = obj
+        let programs: HashMap<String, Program, RandomState> = obj
             .programs
             .drain()
             .map(|(name, obj)| {
-                let prog_name = if self.features.bpf_name {
-                    Some(name.clone())
-                } else {
-                    None
-                };
                 let data = ProgramData {
-                    name: prog_name,
+                    name: name.clone(),
+                    load_name: self.features.bpf_name,
+                    pin_path: self.pin_path.to_owned(),
                     obj,
                     fd: None,
                     links: Vec::new(),
@@ -414,7 +420,10 @@ impl<'a> BpfLoader<'a> {
                     btf_fd,
                 };
                 let program = if self.extensions.contains(name.as_str()) {
-                    Program::Extension(Extension { data })
+                    Program::Extension(Extension {
+                        data,
+                        pin_path: PathBuf::new(),
+                    })
                 } else {
                     match &data.obj.section {
                         ProgramSection::KProbe { .. } => Program::KProbe(KProbe {
@@ -472,13 +481,28 @@ impl<'a> BpfLoader<'a> {
                         ProgramSection::RawTracePoint { .. } => {
                             Program::RawTracePoint(RawTracePoint { data })
                         }
-                        ProgramSection::Lsm { .. } => Program::Lsm(Lsm { data }),
+                        ProgramSection::Lsm { .. } => Program::Lsm(Lsm {
+                            data,
+                            pin_path: PathBuf::new(),
+                        }),
                         ProgramSection::BtfTracePoint { .. } => {
-                            Program::BtfTracePoint(BtfTracePoint { data })
+                            Program::BtfTracePoint(BtfTracePoint {
+                                data,
+                                pin_path: PathBuf::new(),
+                            })
                         }
-                        ProgramSection::FEntry { .. } => Program::FEntry(FEntry { data }),
-                        ProgramSection::FExit { .. } => Program::FExit(FExit { data }),
-                        ProgramSection::Extension { .. } => Program::Extension(Extension { data }),
+                        ProgramSection::FEntry { .. } => Program::FEntry(FEntry {
+                            data,
+                            pin_path: PathBuf::new(),
+                        }),
+                        ProgramSection::FExit { .. } => Program::FExit(FExit {
+                            data,
+                            pin_path: PathBuf::new(),
+                        }),
+                        ProgramSection::Extension { .. } => Program::Extension(Extension {
+                            data,
+                            pin_path: PathBuf::new(),
+                        }),
                     }
                 };
                 (name, program)
@@ -693,9 +717,8 @@ impl Bpf {
     /// ```no_run
     /// # use std::path::Path;
     /// # let mut bpf = aya::Bpf::load(&[])?;
-    /// # let pin_path = Path::new("/tmp/pin_path");
     /// for (_, program) in bpf.programs_mut() {
-    ///     program.pin(pin_path)?;
+    ///     program.pin()?;
     /// }
     /// # Ok::<(), aya::BpfError>(())
     /// ```
@@ -710,6 +733,16 @@ pub enum BpfError {
     /// Error loading file
     #[error("error loading {path}")]
     FileError {
+        /// The file path
+        path: PathBuf,
+        #[source]
+        /// The original io::Error
+        error: io::Error,
+    },
+
+    /// Error creating directory
+    #[error("error creating directory {path}")]
+    DirectoryError {
         /// The file path
         path: PathBuf,
         #[source]

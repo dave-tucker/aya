@@ -5,7 +5,9 @@ use std::{
     ffi::{CStr, CString},
     fs::{self, File},
     io::{self, BufReader},
-    mem, slice,
+    mem,
+    path::{Path, PathBuf},
+    slice,
     str::FromStr,
 };
 
@@ -206,6 +208,25 @@ impl VerifierLog {
             None
         } else {
             Some(CStr::from_bytes_with_nul(&self.buf).unwrap())
+        }
+    }
+}
+
+pub(crate) enum PinnedObject {
+    Map { name: String },
+    Program { name: String },
+    Link { prog_name: String, info: String },
+}
+
+pub(crate) fn get_pinned_path<P: AsRef<Path>>(p: P, obj: PinnedObject) -> PathBuf {
+    match obj {
+        PinnedObject::Map { name } => p.as_ref().join(format!("map_{}", name)),
+        PinnedObject::Program { name } => {
+            // TODO: It might be good to include the program type here
+            p.as_ref().join(format!("prog_{}", name))
+        }
+        PinnedObject::Link { prog_name, info } => {
+            p.as_ref().join(format!("link_{}_{}", prog_name, info))
         }
     }
 }

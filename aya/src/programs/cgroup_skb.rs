@@ -1,4 +1,7 @@
-use std::os::unix::prelude::{AsRawFd, RawFd};
+use std::{
+    fmt::Display,
+    os::unix::prelude::{AsRawFd, RawFd},
+};
 
 use crate::{
     generated::{
@@ -7,6 +10,7 @@ use crate::{
     },
     programs::{load_program, LinkRef, ProgAttachLink, ProgramData, ProgramError},
     sys::{bpf_link_create, bpf_prog_attach, kernel_version},
+    util::{get_pinned_path, PinnedObject},
 };
 
 use super::FdLink;
@@ -82,6 +86,13 @@ impl CgroupSkb {
         let prog_fd = self.data.fd_or_err()?;
         let cgroup_fd = cgroup.as_raw_fd();
 
+        let pin_path = get_pinned_path(
+            &self.data.pin_path,
+            PinnedObject::Link {
+                prog_name: self.data.name.clone(),
+                info: format!("{}_{}", &cgroup_fd, attach_type),
+            },
+        );
         let attach_type = match attach_type {
             CgroupSkbAttachType::Ingress => BPF_CGROUP_INET_INGRESS,
             CgroupSkbAttachType::Egress => BPF_CGROUP_INET_EGRESS,
@@ -94,7 +105,10 @@ impl CgroupSkb {
                     io_error,
                 },
             )? as RawFd;
-            Ok(self.data.link(FdLink { fd: Some(link_fd) }))
+            Ok(self.data.link(FdLink {
+                fd: Some(link_fd),
+                pin_path,
+            }))
         } else {
             bpf_prog_attach(prog_fd, cgroup_fd, attach_type).map_err(|(_, io_error)| {
                 ProgramError::SyscallError {
@@ -117,4 +131,14 @@ pub enum CgroupSkbAttachType {
     Ingress,
     /// Attach to egress.
     Egress,
+}
+
+impl Display for CgroupSkbAttachType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use CgroupSkbAttachType::*;
+        match self {
+            Ingress => write!(f, "ingress"),
+            Egress => write!(f, "egress"),
+        }
+    }
 }

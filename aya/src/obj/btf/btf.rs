@@ -428,6 +428,22 @@ impl Btf {
                     fixed_ty.name_off = 0;
                     types.types[i] = BtfType::Ptr(fixed_ty)
                 }
+                /*
+                // Another Rust BTF Fixup, this type for Structs
+                BtfType::Struct(ty, members) => {
+                    let mut fixed_ty = *ty;
+                    let mut members = members.clone();
+                    fixed_ty.name_off = 0;
+                    if members.len() == 1 && members[0].type_ == 0 {
+                        let new_id = types.types.len() as u32;
+                        // HACK: Use add_type to make sure offsets are adjusted
+                        self.add_type(BtfType::new_ptr(0,0 ));
+                        types.types.push(BtfType::new_ptr(0,0 ));
+                        members[0].type_ = new_id;
+                    }
+                    types.types[i] = BtfType::Struct(fixed_ty, members)
+                }
+                */
                 // Sanitize VAR if they are not supported
                 BtfType::Var(ty, _) if !features.btf_datasec => {
                     types.types[i] = BtfType::new_int(ty.name_off, 1, 0, 0);

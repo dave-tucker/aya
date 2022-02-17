@@ -1,6 +1,7 @@
 pub(crate) mod btf;
 mod relocation;
 
+use log::debug;
 use object::{
     read::{Object as ElfObject, ObjectSection, Section as ObjSection},
     Endianness, ObjectSymbol, ObjectSymbolTable, RelocationTarget, SectionIndex, SectionKind,
@@ -337,6 +338,7 @@ impl Object {
                     });
                 }
                 map.data.splice(start..end, data.iter().cloned());
+                debug!("map data is {:?}", map.data)
             } else {
                 return Err(ParseError::SymbolNotFound {
                     name: name.to_owned(),

@@ -4,7 +4,10 @@ use std::ffi::CString;
 use crate::{
     generated::bpf_prog_type::BPF_PROG_TYPE_RAW_TRACEPOINT,
     programs::{load_program, utils::attach_raw_tracepoint, LinkRef, ProgramData, ProgramError},
+    util::{get_pinned_path, PinnedObject},
 };
+
+use super::FdLink;
 
 /// A program that can be attached at a pre-defined kernel trace point, but also
 /// has an access to kernel internal arguments of trace points, which
@@ -46,7 +49,18 @@ impl RawTracePoint {
 
     /// Attaches the program to the given tracepoint.
     pub fn attach(&mut self, tp_name: &str) -> Result<LinkRef, ProgramError> {
+        let pin_path = get_pinned_path(
+            &self.data.pin_path,
+            PinnedObject::Link {
+                prog_name: self.data.name.clone(),
+                info: tp_name.to_string(),
+            },
+        );
         let tp_name_c = CString::new(tp_name).unwrap();
-        attach_raw_tracepoint(&mut self.data, Some(&tp_name_c))
+        let fd = attach_raw_tracepoint(&mut self.data, Some(&tp_name_c))?;
+        Ok(self.data.link(FdLink {
+            fd: Some(fd),
+            pin_path,
+        }))
     }
 }

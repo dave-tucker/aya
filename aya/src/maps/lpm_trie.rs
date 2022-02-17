@@ -227,7 +227,7 @@ mod tests {
         sys::{override_syscall, SysResult, Syscall},
     };
     use libc::{EFAULT, ENOENT};
-    use std::{io, mem, net::Ipv4Addr};
+    use std::{io, mem, net::Ipv4Addr, path::PathBuf};
 
     fn new_obj_map() -> obj::Map {
         obj::Map {
@@ -254,6 +254,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(matches!(
             LpmTrie::<_, u16, u32>::new(&map),
@@ -270,6 +272,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(matches!(
             LpmTrie::<_, u32, u16>::new(&map),
@@ -297,6 +301,8 @@ mod tests {
             },
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(matches!(
@@ -311,6 +317,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(matches!(
@@ -325,6 +333,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(LpmTrie::<_, u32, u32>::new(&mut map).is_ok());
@@ -336,6 +346,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(LpmTrie::<_, u32, u32>::try_from(&map).is_ok())
     }
@@ -348,6 +360,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let trie = LpmTrie::<_, u32, u32>::new(&mut map).unwrap();
         let ipaddr = Ipv4Addr::new(8, 8, 8, 8);
@@ -372,6 +386,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         let trie = LpmTrie::<_, u32, u32>::new(&mut map).unwrap();
@@ -388,6 +404,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let trie = LpmTrie::<_, u32, u32>::new(&mut map).unwrap();
         let ipaddr = Ipv4Addr::new(8, 8, 8, 8);
@@ -412,6 +430,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let trie = LpmTrie::<_, u32, u32>::new(&mut map).unwrap();
         let ipaddr = Ipv4Addr::new(8, 8, 8, 8);
@@ -426,6 +446,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let trie = LpmTrie::<_, u32, u32>::new(&map).unwrap();
         let ipaddr = Ipv4Addr::new(8, 8, 8, 8);
@@ -450,6 +472,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let trie = LpmTrie::<_, u32, u32>::new(&map).unwrap();
         let ipaddr = Ipv4Addr::new(8, 8, 8, 8);

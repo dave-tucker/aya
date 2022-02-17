@@ -1,4 +1,7 @@
-use std::os::unix::prelude::{AsRawFd, RawFd};
+use std::{
+    os::unix::prelude::{AsRawFd, RawFd},
+    path::PathBuf,
+};
 use thiserror::Error;
 
 use object::Endianness;
@@ -49,6 +52,7 @@ pub enum ExtensionError {
 #[doc(alias = "BPF_PROG_TYPE_EXT")]
 pub struct Extension {
     pub(crate) data: ProgramData,
+    pub(crate) pin_path: PathBuf,
 }
 
 impl Extension {
@@ -136,6 +140,9 @@ impl Extension {
                 call: "bpf_link_create".to_owned(),
                 io_error,
             })? as RawFd;
-        Ok(self.data.link(FdLink { fd: Some(link_fd) }))
+        Ok(self.data.link(FdLink {
+            fd: Some(link_fd),
+            pin_path: self.pin_path.clone(),
+        }))
     }
 }

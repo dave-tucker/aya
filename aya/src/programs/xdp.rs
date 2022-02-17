@@ -12,6 +12,7 @@ use crate::{
     },
     programs::{load_program, FdLink, Link, LinkRef, ProgramData, ProgramError},
     sys::{bpf_link_create, kernel_version, netlink_set_xdp_fd},
+    util::get_pinned_path,
 };
 
 /// The type returned when attaching an [`Xdp`] program fails on kernels `< 5.9`.
@@ -100,7 +101,13 @@ impl Xdp {
                 name: interface.to_string(),
             });
         }
-
+        let pin_path = get_pinned_path(
+            &self.data.pin_path,
+            crate::util::PinnedObject::Link {
+                prog_name: self.data.name.clone(),
+                info: interface.to_string(),
+            },
+        );
         let k_ver = kernel_version().unwrap();
         if k_ver >= (5, 9, 0) {
             let link_fd = bpf_link_create(prog_fd, if_index, BPF_XDP, None, flags.bits).map_err(
@@ -109,9 +116,10 @@ impl Xdp {
                     io_error,
                 },
             )? as RawFd;
-            Ok(self
-                .data
-                .link(XdpLink::FdLink(FdLink { fd: Some(link_fd) })))
+            Ok(self.data.link(XdpLink::FdLink(FdLink {
+                fd: Some(link_fd),
+                pin_path,
+            })))
         } else {
             unsafe { netlink_set_xdp_fd(if_index, prog_fd, None, flags.bits) }
                 .map_err(|io_error| XdpError::NetlinkError { io_error })?;
@@ -147,6 +155,12 @@ impl Link for NlLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "netlink".to_string(),
+        })
+    }
 }
 
 impl Drop for NlLink {
@@ -166,6 +180,12 @@ impl Link for XdpLink {
         match self {
             XdpLink::FdLink(link) => link.detach(),
             XdpLink::NlLink(link) => link.detach(),
+        }
+    }
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        match self {
+            XdpLink::FdLink(link) => link.pin(),
+            XdpLink::NlLink(link) => link.pin(),
         }
     }
 }

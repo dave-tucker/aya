@@ -59,13 +59,15 @@ mod utils;
 mod xdp;
 
 use libc::{close, dup, ENOSPC};
+use log::debug;
 use std::{
     cell::RefCell,
     convert::TryFrom,
     ffi::CString,
+    fmt::Display,
     io,
     os::unix::io::{AsRawFd, RawFd},
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 use thiserror::Error;
@@ -99,7 +101,7 @@ use crate::{
         bpf_get_object, bpf_load_program, bpf_obj_get_info_by_fd, bpf_pin_object, bpf_prog_detach,
         bpf_prog_get_fd_by_id, bpf_prog_query, retry_with_verifier_logs, BpfLoadProgramAttrs,
     },
-    util::VerifierLog,
+    util::{get_pinned_path, PinnedObject, VerifierLog},
 };
 
 /// Error type returned when working with programs.
@@ -195,10 +197,17 @@ pub enum ProgramError {
     #[error(transparent)]
     Btf(#[from] BtfError),
 
-    /// The program is not attached.
+    /// The program name is invalid/
     #[error("the program name `{name}` is invalid")]
     InvalidName {
         /// program name
+        name: String,
+    },
+
+    /// This type of link may not be pinned
+    #[error("{name} links may not be pinned")]
+    PinningNotSupported {
+        /// the name of the link type
         name: String,
     },
 }
@@ -290,9 +299,9 @@ impl Program {
         }
     }
 
-    /// Pin the program to the provided path
-    pub fn pin<P: AsRef<Path>>(&mut self, path: P) -> Result<(), ProgramError> {
-        self.data_mut().pin(path)
+    /// Pin the program to BPFFS
+    pub fn pin(&self) -> Result<(), ProgramError> {
+        self.data().pin()
     }
 
     fn data(&self) -> &ProgramData {
@@ -344,7 +353,9 @@ impl Program {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ProgramData {
-    pub(crate) name: Option<String>,
+    pub(crate) name: String,
+    pub(crate) load_name: bool,
+    pub(crate) pin_path: PathBuf,
     pub(crate) obj: obj::Program,
     pub(crate) fd: Option<RawFd>,
     pub(crate) links: Vec<Rc<RefCell<dyn Link>>>,
@@ -366,14 +377,19 @@ impl ProgramData {
         LinkRef::new(link)
     }
 
-    pub fn pin<P: AsRef<Path>>(&mut self, path: P) -> Result<(), ProgramError> {
+    fn pin(&self) -> Result<(), ProgramError> {
         let fd = self.fd_or_err()?;
-        let path_string =
-            CString::new(path.as_ref().to_string_lossy().into_owned()).map_err(|e| {
-                MapError::InvalidPinPath {
-                    error: e.to_string(),
-                }
-            })?;
+        let path = get_pinned_path(
+            &self.pin_path,
+            PinnedObject::Program {
+                name: self.name.clone(),
+            },
+        );
+        let path_string = CString::new(path.to_string_lossy().into_owned()).map_err(|e| {
+            MapError::InvalidPinPath {
+                error: e.to_string(),
+            }
+        })?;
         bpf_pin_object(fd, &path_string).map_err(|(_code, io_error)| {
             ProgramError::SyscallError {
                 call: "BPF_OBJ_PIN".to_string(),
@@ -383,6 +399,52 @@ impl ProgramData {
         Ok(())
     }
 }
+
+impl Display for bpf_prog_type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use bpf_prog_type::*;
+        match self {
+            BPF_PROG_TYPE_SOCKET_FILTER => write!(f, "socket_filter"),
+            BPF_PROG_TYPE_KPROBE => write!(f, "kprobe"),
+            BPF_PROG_TYPE_SCHED_CLS => write!(f, "sched_cls"),
+            BPF_PROG_TYPE_SCHED_ACT => write!(f, "sched_act"),
+            BPF_PROG_TYPE_TRACEPOINT => write!(f, "tracepoint"),
+            BPF_PROG_TYPE_XDP => write!(f, "xdp"),
+            BPF_PROG_TYPE_PERF_EVENT => write!(f, "perf_event"),
+            BPF_PROG_TYPE_CGROUP_SKB => write!(f, "cgroup_skb"),
+            BPF_PROG_TYPE_CGROUP_SOCK => write!(f, "croup_sock"),
+            BPF_PROG_TYPE_LWT_IN => write!(f, "lwt_in"),
+            BPF_PROG_TYPE_LWT_OUT => write!(f, "lwt_out"),
+            BPF_PROG_TYPE_LWT_XMIT => write!(f, "lwt_xmit"),
+            BPF_PROG_TYPE_SOCK_OPS => write!(f, "sock_ops"),
+            BPF_PROG_TYPE_SK_SKB => write!(f, "sk_skb"),
+            BPF_PROG_TYPE_CGROUP_DEVICE => write!(f, "cgroup_device"),
+            BPF_PROG_TYPE_SK_MSG => write!(f, "sk_msg"),
+            BPF_PROG_TYPE_RAW_TRACEPOINT => write!(f, "raw_tracepoint"),
+            BPF_PROG_TYPE_CGROUP_SOCK_ADDR => write!(f, "cgroup_sock_addr"),
+            BPF_PROG_TYPE_LWT_SEG6LOCAL => write!(f, "lwt_seg6local"),
+            BPF_PROG_TYPE_LIRC_MODE2 => write!(f, "lirc_mode2"),
+            BPF_PROG_TYPE_SK_REUSEPORT => write!(f, "sk_reuseport"),
+            BPF_PROG_TYPE_FLOW_DISSECTOR => write!(f, "flow_dissector"),
+            BPF_PROG_TYPE_CGROUP_SYSCTL => write!(f, "cgroup_sysctl"),
+            BPF_PROG_TYPE_RAW_TRACEPOINT_WRITABLE => write!(f, "raw_tracepoint_writable"),
+            BPF_PROG_TYPE_CGROUP_SOCKOPT => write!(f, "cgroup_sockopt"),
+            BPF_PROG_TYPE_TRACING => write!(f, "tracing"),
+            BPF_PROG_TYPE_STRUCT_OPS => write!(f, "struct_ops"),
+            BPF_PROG_TYPE_EXT => write!(f, "ext"),
+            BPF_PROG_TYPE_LSM => write!(f, "lsm"),
+            BPF_PROG_TYPE_SK_LOOKUP => write!(f, "sk_lookup"),
+            BPF_PROG_TYPE_SYSCALL => write!(f, "syscall"),
+            _ => write!(f, "unknown"),
+        }
+    }
+}
+
+/*
+fn pin_link<T: Link + 'static>(prog_type: bpf_prog_type, data: &mut ProgramData, link: T) -> Result<(), ProgramError> {
+    Ok(())
+}
+*/
 
 fn load_program(prog_type: bpf_prog_type, data: &mut ProgramData) -> Result<(), ProgramError> {
     let ProgramData { obj, fd, .. } = data;
@@ -414,8 +476,8 @@ fn load_program(prog_type: bpf_prog_type, data: &mut ProgramData) -> Result<(), 
 
     let mut logger = VerifierLog::new();
 
-    let prog_name = if let Some(name) = &data.name {
-        let mut name = name.clone();
+    let prog_name = if data.load_name {
+        let mut name = data.name.clone();
         if name.len() > 15 {
             name.truncate(15);
         }
@@ -504,6 +566,9 @@ pub(crate) fn query<T: AsRawFd>(
 pub trait Link: std::fmt::Debug {
     /// detaches an attached program
     fn detach(&mut self) -> Result<(), ProgramError>;
+    /// pins the link to BPFFS so the attachment
+    /// will persist beyond the lifetime of [`Bpf`]
+    fn pin(&mut self) -> Result<(), ProgramError>;
 }
 
 /// The return type of `program.attach(...)`.
@@ -525,11 +590,16 @@ impl Link for LinkRef {
     fn detach(&mut self) -> Result<(), ProgramError> {
         self.inner.borrow_mut().detach()
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        self.inner.borrow_mut().pin()
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct FdLink {
     fd: Option<RawFd>,
+    pub(crate) pin_path: PathBuf,
 }
 
 impl Link for FdLink {
@@ -541,10 +611,33 @@ impl Link for FdLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        let path_string =
+            CString::new(self.pin_path.to_string_lossy().into_owned()).map_err(|e| {
+                MapError::InvalidPinPath {
+                    error: e.to_string(),
+                }
+            })?;
+        if let Some(fd) = self.fd.take() {
+            bpf_pin_object(fd, &path_string).map_err(|(_, io_error)| {
+                ProgramError::SyscallError {
+                    call: "BPF_OBJ_PIN".to_string(),
+                    io_error,
+                }
+            })?;
+            // it's safe to close the FD here since we just pinned the link
+            unsafe { close(fd) };
+            Ok(())
+        } else {
+            Err(ProgramError::NotLoaded)
+        }
+    }
 }
 
 impl Drop for FdLink {
     fn drop(&mut self) {
+        debug!("detaching program link");
         let _ = self.detach();
     }
 }
@@ -580,6 +673,12 @@ impl Link for ProgAttachLink {
         } else {
             Err(ProgramError::AlreadyDetached)
         }
+    }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "ProgAttachLink".to_string(),
+        })
     }
 }
 

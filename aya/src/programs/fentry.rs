@@ -1,9 +1,13 @@
 //! fentry programs.
+use std::path::PathBuf;
+
 use crate::{
     generated::{bpf_attach_type::BPF_TRACE_FENTRY, bpf_prog_type::BPF_PROG_TYPE_TRACING},
     obj::btf::{Btf, BtfKind},
     programs::{load_program, utils::attach_raw_tracepoint, LinkRef, ProgramData, ProgramError},
 };
+
+use super::FdLink;
 
 /// A program that can be attached to the entry point of (almost) any kernel
 /// function.
@@ -44,6 +48,7 @@ use crate::{
 #[doc(alias = "BPF_PROG_TYPE_TRACING")]
 pub struct FEntry {
     pub(crate) data: ProgramData,
+    pub(crate) pin_path: PathBuf,
 }
 
 impl FEntry {
@@ -62,6 +67,10 @@ impl FEntry {
 
     /// Attaches the program
     pub fn attach(&mut self) -> Result<LinkRef, ProgramError> {
-        attach_raw_tracepoint(&mut self.data, None)
+        let fd = attach_raw_tracepoint(&mut self.data, None)?;
+        Ok(self.data.link(FdLink {
+            fd: Some(fd),
+            pin_path: self.pin_path.clone(),
+        }))
     }
 }

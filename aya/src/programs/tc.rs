@@ -162,6 +162,12 @@ impl Link for TcLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "tc".to_string(),
+        })
+    }
 }
 
 /// Add the `clasct` qdisc to the given interface.

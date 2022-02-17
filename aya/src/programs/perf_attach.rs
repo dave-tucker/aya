@@ -33,6 +33,12 @@ impl Link for PerfLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "PerfLink".to_string(),
+        })
+    }
 }
 
 impl Drop for PerfLink {

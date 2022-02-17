@@ -142,7 +142,7 @@ impl<'a, K: Pod, V: Pod> TryFrom<&'a mut Map> for HashMap<&'a mut Map, K, V> {
 
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::{io, path::PathBuf};
 
     use libc::{EFAULT, ENOENT};
 
@@ -183,6 +183,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(matches!(
             HashMap::<_, u8, u32>::new(&map),
@@ -199,6 +201,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(matches!(
             HashMap::<_, u32, u16>::new(&map),
@@ -226,6 +230,8 @@ mod tests {
             },
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(matches!(
@@ -240,6 +246,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(matches!(
@@ -254,6 +262,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(HashMap::<_, u32, u32>::new(&mut map).is_ok());
@@ -265,6 +275,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         assert!(HashMap::<_, u32, u32>::try_from(&map).is_ok())
     }
@@ -286,6 +298,8 @@ mod tests {
             },
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
 
         assert!(HashMap::<_, u32, u32>::try_from(&map).is_ok())
@@ -299,6 +313,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let mut hm = HashMap::<_, u32, u32>::new(&mut map).unwrap();
 
@@ -322,6 +338,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let mut hm = HashMap::<_, u32, u32>::new(&mut map).unwrap();
 
@@ -336,6 +354,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let mut hm = HashMap::<_, u32, u32>::new(&mut map).unwrap();
 
@@ -359,6 +379,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let mut hm = HashMap::<_, u32, u32>::new(&mut map).unwrap();
 
@@ -372,6 +394,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -394,6 +418,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -430,6 +456,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
         let keys = hm.keys().collect::<Result<Vec<_>, _>>();
@@ -474,6 +502,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -502,6 +532,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -532,6 +564,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
         let items = hm.iter().collect::<Result<Vec<_>, _>>().unwrap();
@@ -565,6 +599,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -599,6 +635,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 
@@ -639,6 +677,8 @@ mod tests {
             obj: new_obj_map(),
             fd: Some(42),
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         };
         let hm = HashMap::<_, u32, u32>::new(&map).unwrap();
 

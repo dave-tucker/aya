@@ -1,9 +1,13 @@
 //! LSM probes.
+use std::path::PathBuf;
+
 use crate::{
     generated::{bpf_attach_type::BPF_LSM_MAC, bpf_prog_type::BPF_PROG_TYPE_LSM},
     obj::btf::{Btf, BtfKind},
     programs::{load_program, utils::attach_raw_tracepoint, LinkRef, ProgramData, ProgramError},
 };
+
+use super::FdLink;
 
 /// A program that attaches to Linux LSM hooks. Used to implement security policy and
 /// audit logging.
@@ -47,6 +51,7 @@ use crate::{
 #[doc(alias = "BPF_PROG_TYPE_LSM")]
 pub struct Lsm {
     pub(crate) data: ProgramData,
+    pub(crate) pin_path: PathBuf,
 }
 
 impl Lsm {
@@ -68,6 +73,10 @@ impl Lsm {
 
     /// Attaches the program.
     pub fn attach(&mut self) -> Result<LinkRef, ProgramError> {
-        attach_raw_tracepoint(&mut self.data, None)
+        let fd = attach_raw_tracepoint(&mut self.data, None)?;
+        Ok(self.data.link(FdLink {
+            fd: Some(fd),
+            pin_path: self.pin_path.clone(),
+        }))
     }
 }

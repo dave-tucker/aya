@@ -1,9 +1,13 @@
 //! BTF-enabled raw tracepoints.
+use std::path::PathBuf;
+
 use crate::{
     generated::{bpf_attach_type::BPF_TRACE_RAW_TP, bpf_prog_type::BPF_PROG_TYPE_TRACING},
     obj::btf::{Btf, BtfKind},
     programs::{load_program, utils::attach_raw_tracepoint, LinkRef, ProgramData, ProgramError},
 };
+
+use super::FdLink;
 
 /// Marks a function as a [BTF-enabled raw tracepoint][1] eBPF program that can be attached at
 /// a pre-defined kernel trace point.
@@ -45,6 +49,7 @@ use crate::{
 #[doc(alias = "BPF_PROG_TYPE_TRACING")]
 pub struct BtfTracePoint {
     pub(crate) data: ProgramData,
+    pub(crate) pin_path: PathBuf,
 }
 
 impl BtfTracePoint {
@@ -66,6 +71,10 @@ impl BtfTracePoint {
 
     /// Attaches the program.
     pub fn attach(&mut self) -> Result<LinkRef, ProgramError> {
-        attach_raw_tracepoint(&mut self.data, None)
+        let fd = attach_raw_tracepoint(&mut self.data, None)?;
+        Ok(self.data.link(FdLink {
+            fd: Some(fd),
+            pin_path: self.pin_path.clone(),
+        }))
     }
 }

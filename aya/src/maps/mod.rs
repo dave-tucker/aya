@@ -34,7 +34,7 @@
 //! implement the [Pod] trait.
 use std::{
     convert::TryFrom, ffi::CString, io, marker::PhantomData, mem, ops::Deref, os::unix::io::RawFd,
-    path::Path, ptr,
+    path::PathBuf, ptr,
 };
 use thiserror::Error;
 
@@ -212,8 +212,10 @@ pub enum MapError {
 pub struct Map {
     pub(crate) obj: obj::Map,
     pub(crate) fd: Option<RawFd>,
+    pub(crate) name: String,
+    pub(crate) pin_path: PathBuf,
     /// Indicates if this map has been pinned to bpffs
-    pub pinned: bool,
+    pub(crate) pinned: bool,
 }
 
 impl Map {
@@ -238,16 +240,13 @@ impl Map {
         Ok(fd)
     }
 
-    pub(crate) fn open_pinned<P: AsRef<Path>>(
-        &mut self,
-        name: &str,
-        path: P,
-    ) -> Result<RawFd, MapError> {
+    pub(crate) fn open_pinned(&mut self) -> Result<RawFd, MapError> {
         if self.fd.is_some() {
-            return Err(MapError::AlreadyCreated { name: name.into() });
+            return Err(MapError::AlreadyCreated {
+                name: self.name.clone(),
+            });
         }
-        let map_path = path.as_ref().join(name);
-        let path_string = match CString::new(map_path.to_str().unwrap()) {
+        let path_string = match CString::new(self.pin_path.to_str().unwrap()) {
             Ok(s) => s,
             Err(e) => {
                 return Err(MapError::InvalidPinPath {
@@ -256,7 +255,7 @@ impl Map {
             }
         };
         let fd = bpf_get_object(&path_string).map_err(|(code, io_error)| MapError::PinError {
-            name: name.into(),
+            name: self.name.clone(),
             code,
             io_error,
         })? as RawFd;
@@ -275,17 +274,19 @@ impl Map {
         self.fd.ok_or(MapError::NotCreated)
     }
 
-    pub(crate) fn pin<P: AsRef<Path>>(&mut self, name: &str, path: P) -> Result<(), MapError> {
+    pub(crate) fn pin(&mut self) -> Result<(), MapError> {
         if self.pinned {
-            return Err(MapError::AlreadyPinned { name: name.into() });
+            return Err(MapError::AlreadyPinned {
+                name: self.name.clone(),
+            });
         }
-        let map_path = path.as_ref().join(name);
         let fd = self.fd_or_err()?;
-        let path_string = CString::new(map_path.to_string_lossy().into_owned()).map_err(|e| {
-            MapError::InvalidPinPath {
-                error: e.to_string(),
-            }
-        })?;
+        let path_string =
+            CString::new(self.pin_path.to_string_lossy().into_owned()).map_err(|e| {
+                MapError::InvalidPinPath {
+                    error: e.to_string(),
+                }
+            })?;
         bpf_pin_object(fd, &path_string).map_err(|(code, io_error)| MapError::SyscallError {
             call: "BPF_OBJ_PIN".to_string(),
             code,
@@ -577,6 +578,8 @@ mod tests {
             obj: new_obj_map(),
             fd: None,
             pinned: false,
+            name: "test".to_string(),
+            pin_path: PathBuf::new(),
         }
     }
 

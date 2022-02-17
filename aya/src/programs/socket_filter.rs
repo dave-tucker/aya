@@ -122,6 +122,12 @@ impl Link for SocketFilterLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "SocketFilter".to_string(),
+        })
+    }
 }
 
 impl Drop for SocketFilterLink {

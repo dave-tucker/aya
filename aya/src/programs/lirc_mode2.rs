@@ -139,6 +139,12 @@ impl Link for LircLink {
             Err(ProgramError::AlreadyDetached)
         }
     }
+
+    fn pin(&mut self) -> Result<(), ProgramError> {
+        Err(ProgramError::PinningNotSupported {
+            name: "lirc_mode2".to_string(),
+        })
+    }
 }
 
 impl Drop for LircLink {
