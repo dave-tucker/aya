@@ -23,7 +23,7 @@ use crate::{
 
 use super::{
     info::{FuncSecInfo, LineSecInfo},
-    type_vlen, FuncInfo, LineInfo,
+    type_vlen, FuncInfo, LineInfo, ResolveType,
 };
 
 pub(crate) const MAX_RESOLVE_DEPTH: u8 = 32;
@@ -357,41 +357,26 @@ impl Btf {
         let mut n_elems = 1;
         for _ in 0..MAX_RESOLVE_DEPTH {
             let ty = self.types.type_by_id(type_id)?;
-
-            use BtfType::*;
             let size = match ty {
-                Int(ty, _)
-                | Struct(ty, _)
-                | Union(ty, _)
-                | Enum(ty, _)
-                | DataSec(ty, _)
-                | Float(ty) => {
-                    // Safety: union
-                    unsafe { ty.__bindgen_anon_1.size as usize }
-                }
-                Ptr(_) => mem::size_of::<*const c_void>(), // FIXME
-                Typedef(ty)
-                | Volatile(ty)
-                | Const(ty)
-                | Restrict(ty)
-                | Var(ty, _)
-                | DeclTag(ty, _)
-                | TypeTag(ty) => {
-                    // Safety: union
-                    type_id = unsafe { ty.__bindgen_anon_1.type_ };
+                BtfType::Array(array) => {
+                    n_elems = array.len();
+                    type_id = array.next_type().unwrap();
                     continue;
                 }
-                Array(_, array) => {
-                    n_elems *= array.nelems as usize;
-                    type_id = array.type_;
-                    continue;
-                }
-                Unknown | Fwd(_) | Func(_) | FuncProto(_, _) => {
-                    return Err(BtfError::UnexpectedBtfType { type_id })
+                other => {
+                    if let Some(size) = other.size() {
+                        size
+                    } else {
+                        if let Some(next) = other.next_type() {
+                            type_id = next;
+                            continue;
+                        } else {
+                            return Err(BtfError::UnexpectedBtfType { type_id });
+                        }
+                    }
                 }
             };
-
-            return Ok(size * n_elems);
+            return Ok((size * n_elems) as usize);
         }
 
         Err(BtfError::MaximumTypeDepthReached {

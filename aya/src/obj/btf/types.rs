@@ -18,28 +18,619 @@ use crate::{
     obj::btf::{Btf, BtfError, MAX_RESOLVE_DEPTH},
 };
 
+use super::btf;
+
 #[derive(Clone, Debug)]
 pub(crate) enum BtfType {
     Unknown,
-    Fwd(btf_type),
-    Const(btf_type),
-    Volatile(btf_type),
-    Restrict(btf_type),
-    Ptr(btf_type),
-    Typedef(btf_type),
-    Func(btf_type),
-    Int(btf_type, u32),
-    Float(btf_type),
-    Enum(btf_type, Vec<btf_enum>),
-    Array(btf_type, btf_array),
-    Struct(btf_type, Vec<btf_member>),
-    Union(btf_type, Vec<btf_member>),
-    FuncProto(btf_type, Vec<btf_param>),
-    Var(btf_type, btf_var),
-    DataSec(btf_type, Vec<btf_var_secinfo>),
-    DeclTag(btf_type, btf_decl_tag),
-    TypeTag(btf_type),
+    Fwd(Fwd),
+    Const(Const),
+    Volatile(Volatile),
+    Restrict(Restrict),
+    Ptr(Ptr),
+    Typedef(Typedef),
+    Func(Func),
+    Int(Int),
+    Float(Float),
+    Enum(Enum),
+    Array(Array),
+    Struct(Struct),
+    Union(Union),
+    FuncProto(FuncProto),
+    Var(Var),
+    DataSec(DataSec),
+    DeclTag(DeclTag),
+    TypeTag(TypeTag),
 }
+
+#[derive(Clone, Debug)]
+pub(crate) struct Fwd {
+    btf_type: btf_type,
+}
+
+impl Fwd {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Fwd }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Const {
+    btf_type: btf_type,
+}
+
+impl Const {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+        fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Const }
+
+    pub(crate) fn new(type_: u32) -> Self {
+        let info = (BTF_KIND_CONST) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = 0;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        Const { btf_type }
+    }
+    
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Volatile {
+    btf_type: btf_type,
+}
+
+impl Volatile {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Volatile }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Restrict {
+    btf_type: btf_type,
+}
+
+impl Restrict {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Restrict }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Ptr {
+    btf_type: btf_type,
+}
+
+impl Ptr {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Ptr }
+
+    pub(crate) fn new(name_off: u32, type_: u32) -> Self {
+        let info = (BTF_KIND_PTR) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        Ptr { btf_type }
+    }
+    
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Typedef {
+    btf_type: btf_type,
+}
+
+impl Typedef {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Typedef }
+
+    pub(crate) fn new(name_off: u32, type_: u32) -> Self {
+        let info = (BTF_KIND_TYPEDEF) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        Typedef { btf_type }
+    }
+    
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Float {
+    btf_type: btf_type,
+}
+
+impl Float {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Float }
+
+    pub(crate) fn new(name_off: u32, size: u32) -> Self {
+        let info = (BTF_KIND_FLOAT) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.size = size;
+        Float { btf_type }
+    }
+    
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Func {
+    btf_type: btf_type,
+}
+
+impl Func {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Func }
+
+    pub(crate) fn new(name_off: u32, proto: u32, linkage: btf_func_linkage) -> Self {
+        let mut info = (BTF_KIND_FUNC) << 24;
+        info |= (linkage as u32) & 0xFFFF;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = proto;
+        Func{btf_type}
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct TypeTag {
+    btf_type: btf_type,
+}
+
+impl TypeTag {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        bytes_of::<btf_type>(&self.btf_type)
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::TypeTag }
+
+    pub(crate) fn new(name_off: u32, type_: u32) -> Self {
+        let info = (BTF_KIND_TYPE_TAG) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        TypeTag { btf_type }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Int {
+    btf_type: btf_type,
+    data: u32,
+}
+
+impl Int {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        // FIXME: ne_bytes???
+        buf.append(&mut self.data.to_ne_bytes().to_vec());
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Int }
+
+    pub(crate) fn new(name_off: u32, size: u32, encoding: u32, offset: u32) -> Self {
+        let info = (BTF_KIND_INT) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.size = size;
+
+        let mut data = 0u32;
+        data |= (encoding & 0x0f) << 24;
+        data |= (offset & 0xff) << 16;
+        data |= (size * 8) & 0xff;
+        Int{ btf_type, data}
+    }
+
+    pub(crate) fn encoding(&self) -> u32 {
+        (self.data & 0x0f000000) >> 24
+    }
+
+    pub(crate) fn offset(&self) -> u32 {
+        (self.data & 0x00ff0000) >> 16
+    }
+
+    pub(crate) fn bits(&self) -> u32 {
+        self.data & 0x000000ff
+    }
+
+}
+
+
+#[derive(Clone, Debug)]
+pub(crate) struct Enum {
+    btf_type: btf_type,
+    values: Vec<btf_enum>,
+}
+
+impl Enum {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        for en in self.values {
+            buf.append(&mut bytes_of::<btf_enum>(&en).to_vec());
+        }
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Enum }
+    pub(crate) fn new(name_off: u32, values: Vec<btf_enum>) -> Self {
+        let mut info = (BTF_KIND_ENUM) << 24;
+        info |= (values.len() as u32) & 0xFFFF;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.size = 4;
+        Enum{btf_type, values}
+    }
+    
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Struct {
+    btf_type: btf_type,
+    members: Vec<btf_member>,
+}
+
+impl Struct {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        for member in self.members {
+            buf.append(&mut bytes_of::<btf_member>(&member).to_vec());
+        }
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Struct }
+
+    pub(crate) fn new(name_off: u32, members: Vec<btf_member>, size: u32) -> Self {
+        let mut info = (BTF_KIND_STRUCT) << 24;
+        info |= (members.len() as u32) & 0xFFFF;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.size = size;
+       Struct { btf_type, members }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Union {
+    btf_type: btf_type,
+    members: Vec<btf_member>,
+}
+
+impl Union {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        for member in self.members {
+            buf.append(&mut bytes_of::<btf_member>(&member).to_vec());
+        }
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Union }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Array {
+    btf_type: btf_type,
+    array: btf_array,
+}
+
+impl Array {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        buf.append(&mut bytes_of::<btf_array>(&self.array).to_vec());
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn len(&self) -> u32 {
+        self.array.nelems
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Array }
+
+    pub(crate) fn new(name_off: u32, type_: u32, index_type: u32, nelems: u32) -> Self {
+        let info = (BTF_KIND_ARRAY) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        let btf_array = btf_array {
+            type_,
+            index_type,
+            nelems,
+        };
+        Array { btf_type, array: btf_array }
+    }
+
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct FuncProto {
+    btf_type: btf_type,
+    params: Vec<btf_param>,
+}
+
+impl FuncProto {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        for param in self.params {
+            buf.append(&mut bytes_of::<btf_param>(&param).to_vec());
+        }
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::FuncProto }
+
+    pub(crate) fn new(params: Vec<btf_param>, return_type: u32) -> Self {
+        let mut info = (BTF_KIND_FUNC_PROTO) << 24;
+        info |= (params.len() as u32) & 0xFFFF;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = 0;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = return_type;
+        FuncProto{btf_type, params}
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct Var {
+    btf_type: btf_type,
+    var: btf_var,
+}
+
+impl Var {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        buf.append(&mut bytes_of::<btf_var>(&self.var).to_vec());
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::Var }
+
+    pub(crate) fn new(name_off: u32, type_: u32, linkage: u32) -> Self {
+        let info = (BTF_KIND_VAR) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        let var = btf_var { linkage };
+        Var{btf_type, var}
+    }
+
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DataSec {
+    btf_type: btf_type,
+    section_info: Vec<btf_var_secinfo>,
+}
+
+impl DataSec {
+    pub(crate) fn size(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.size })
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        for secinfo in self.section_info {
+            buf.append(&mut bytes_of::<btf_var_secinfo>(&secinfo).to_vec());
+        }
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::DataSec }
+
+    pub(crate) fn new(
+        name_off: u32,
+        variables: Vec<btf_var_secinfo>,
+        size: u32,
+    ) -> Self {
+        let mut info = (BTF_KIND_DATASEC) << 24;
+        info |= (variables.len() as u32) & 0xFFFF;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.size = size;
+        DataSec { btf_type, section_info: variables }
+    }
+}
+
+
+#[derive(Clone, Debug)]
+pub(crate) struct DeclTag {
+    btf_type: btf_type,
+    decl_tag: btf_decl_tag,
+}
+
+impl DeclTag {
+    pub(crate) fn size(&self) -> Option<u32> {
+        None
+    }
+    pub(crate) fn next_type(&self) -> Option<u32> {
+        Some(unsafe { self.btf_type.__bindgen_anon_1.type_ })
+    }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
+        let mut buf = bytes_of::<btf_type>(&self.btf_type).to_vec();
+        buf.append(&mut bytes_of::<btf_decl_tag>(&self.decl_tag).to_vec());
+        &buf
+    }
+    fn name_offset(&self) -> u32 {
+        self.btf_type.name_off
+    }
+    pub(crate) fn kind(&self) -> BtfKind { BtfKind::DeclTag }
+
+    pub(crate) fn new(name_off: u32, type_: u32, component_idx: i32) -> Self {
+        let info = (BTF_KIND_DECL_TAG) << 24;
+        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
+        btf_type.name_off = name_off;
+        btf_type.info = info;
+        btf_type.__bindgen_anon_1.type_ = type_;
+        let decl_tag = btf_decl_tag { component_idx };
+        DeclTag { btf_type, decl_tag }
+    }
+}
+
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u32)]
@@ -150,20 +741,18 @@ unsafe fn read_array<T>(data: &[u8], len: usize) -> Result<Vec<T>, BtfError> {
 impl BtfType {
     #[allow(unused_unsafe)]
     pub(crate) unsafe fn read(data: &[u8], endianness: Endianness) -> Result<BtfType, BtfError> {
-        let ty = unsafe { read::<btf_type>(data)? };
+        let btf_type = unsafe { read::<btf_type>(data)? };
         let data = &data[mem::size_of::<btf_type>()..];
-
-        let vlen = type_vlen(&ty) as usize;
-        use BtfType::*;
-        Ok(match type_kind(&ty)? {
-            BtfKind::Unknown => Unknown,
-            BtfKind::Fwd => Fwd(ty),
-            BtfKind::Const => Const(ty),
-            BtfKind::Volatile => Volatile(ty),
-            BtfKind::Restrict => Restrict(ty),
-            BtfKind::Ptr => Ptr(ty),
-            BtfKind::Typedef => Typedef(ty),
-            BtfKind::Func => Func(ty),
+        let vlen = type_vlen(&btf_type) as usize;
+        Ok(match type_kind(&btf_type)? {
+            BtfKind::Unknown => BtfType::Unknown,
+            BtfKind::Fwd => BtfType::Fwd(Fwd { btf_type }),
+            BtfKind::Const => BtfType::Const(Const { btf_type }),
+            BtfKind::Volatile => BtfType::Volatile(Volatile { btf_type }),
+            BtfKind::Restrict => BtfType::Restrict(Restrict { btf_type }),
+            BtfKind::Ptr => BtfType::Ptr(Ptr { btf_type }),
+            BtfKind::Typedef => BtfType::Typedef(Typedef { btf_type }),
+            BtfKind::Func => BtfType::Func(Func { btf_type }),
             BtfKind::Int => {
                 if mem::size_of::<u32>() > data.len() {
                     return Err(BtfError::InvalidTypeInfo);
@@ -173,297 +762,194 @@ impl BtfType {
                 } else {
                     u32::from_be_bytes
                 };
-                Int(
-                    ty,
-                    read_u32(data[..mem::size_of::<u32>()].try_into().unwrap()),
-                )
+                BtfType::Int(Int {
+                    btf_type,
+                    data: read_u32(data[..mem::size_of::<u32>()].try_into().unwrap()),
+                })
             }
-            BtfKind::Float => Float(ty),
-            BtfKind::Enum => Enum(ty, unsafe { read_array(data, vlen)? }),
-            BtfKind::Array => Array(ty, unsafe { read(data)? }),
-            BtfKind::Struct => Struct(ty, unsafe { read_array(data, vlen)? }),
-            BtfKind::Union => Union(ty, unsafe { read_array(data, vlen)? }),
-            BtfKind::FuncProto => FuncProto(ty, unsafe { read_array(data, vlen)? }),
-            BtfKind::Var => Var(ty, unsafe { read(data)? }),
-            BtfKind::DataSec => DataSec(ty, unsafe { read_array(data, vlen)? }),
-            BtfKind::DeclTag => DeclTag(ty, unsafe { read(data)? }),
-            BtfKind::TypeTag => TypeTag(ty),
+            BtfKind::Float => BtfType::Float(Float { btf_type }),
+            BtfKind::Enum => BtfType::Enum(Enum {
+                btf_type,
+                values: unsafe { read_array(data, vlen)? },
+            }),
+            BtfKind::Array => BtfType::Array(Array {
+                btf_type,
+                array: unsafe { read(data)? },
+            }),
+            BtfKind::Struct => BtfType::Struct(Struct {
+                btf_type,
+                members: unsafe { read_array(data, vlen)? },
+            }),
+            BtfKind::Union => BtfType::Union(Union {
+                btf_type,
+                members: unsafe { read_array(data, vlen)? },
+            }),
+            BtfKind::FuncProto => BtfType::FuncProto(FuncProto {
+                btf_type,
+                params: unsafe { read_array(data, vlen)? },
+            }),
+            BtfKind::Var => BtfType::Var(Var {
+                btf_type,
+                var: unsafe { read(data)? },
+            }),
+            BtfKind::DataSec => BtfType::DataSec(DataSec {
+                btf_type,
+                section_info: unsafe { read_array(data, vlen)? },
+            }),
+            BtfKind::DeclTag => BtfType::DeclTag(DeclTag {
+                btf_type,
+                decl_tag: unsafe { read(data)? },
+            }),
+            BtfKind::TypeTag => BtfType::TypeTag(TypeTag { btf_type }),
         })
     }
 
-    pub(crate) fn to_bytes(&self) -> Vec<u8> {
-        fn bytes_of<T>(val: &T) -> &[u8] {
-            // Safety: all btf types are POD
-            unsafe { crate::util::bytes_of(val) }
-        }
+    pub(crate) fn to_bytes(&self) -> &[u8] {
         match self {
-            BtfType::Fwd(btf_type)
-            | BtfType::Const(btf_type)
-            | BtfType::Volatile(btf_type)
-            | BtfType::Restrict(btf_type)
-            | BtfType::Ptr(btf_type)
-            | BtfType::Typedef(btf_type)
-            | BtfType::Func(btf_type)
-            | BtfType::Float(btf_type)
-            | BtfType::TypeTag(btf_type) => bytes_of::<btf_type>(btf_type).to_vec(),
-            BtfType::Int(btf_type, len) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                buf.append(&mut len.to_ne_bytes().to_vec());
-                buf
-            }
-            BtfType::Enum(btf_type, enums) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                for en in enums {
-                    buf.append(&mut bytes_of::<btf_enum>(en).to_vec());
-                }
-                buf
-            }
-            BtfType::Array(btf_type, btf_array) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                buf.append(&mut bytes_of::<btf_array>(btf_array).to_vec());
-                buf
-            }
-            BtfType::Struct(btf_type, btf_members) | BtfType::Union(btf_type, btf_members) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                for m in btf_members {
-                    buf.append(&mut bytes_of::<btf_member>(m).to_vec());
-                }
-                buf
-            }
-            BtfType::FuncProto(btf_type, btf_params) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                for p in btf_params {
-                    buf.append(&mut bytes_of::<btf_param>(p).to_vec());
-                }
-                buf
-            }
-            BtfType::Var(btf_type, btf_var) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                buf.append(&mut bytes_of::<btf_var>(btf_var).to_vec());
-                buf
-            }
-            BtfType::DataSec(btf_type, btf_var_secinfo) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                for s in btf_var_secinfo {
-                    buf.append(&mut bytes_of::<btf_var_secinfo>(s).to_vec());
-                }
-                buf
-            }
-            BtfType::Unknown => vec![],
-            BtfType::DeclTag(btf_type, btf_decl_tag) => {
-                let mut buf = bytes_of::<btf_type>(btf_type).to_vec();
-                buf.append(&mut bytes_of::<btf_decl_tag>(btf_decl_tag).to_vec());
-                buf
-            }
+            BtfType::Unknown => &[],
+            BtfType::Fwd(t) => t.to_bytes(),
+            BtfType::Const(t) => t.to_bytes(),
+            BtfType::Volatile(t) => t.to_bytes(),
+            BtfType::Restrict(t) => t.to_bytes(),
+            BtfType::Ptr(t) => t.to_bytes(),
+            BtfType::Typedef(t) => t.to_bytes(),
+            BtfType::Func(t) => t.to_bytes(),
+            BtfType::Int(t) => t.to_bytes(),
+            BtfType::Float(t) => t.to_bytes(),
+            BtfType::Enum(t) => t.to_bytes(),
+            BtfType::Array(t) => t.to_bytes(),
+            BtfType::Struct(t) => t.to_bytes(),
+            BtfType::Union(t) => t.to_bytes(),
+            BtfType::FuncProto(t) => t.to_bytes(),
+            BtfType::Var(t) => t.to_bytes(),
+            BtfType::DataSec(t) => t.to_bytes(),
+            BtfType::DeclTag(t) => t.to_bytes(),
+            BtfType::TypeTag(t) => t.to_bytes(),
+        }
+    }
+
+    fn size(&self) -> Option<u32> {
+        match self {
+            BtfType::Unknown => None,
+            BtfType::Fwd(t) => t.size(),
+            BtfType::Const(t) => t.size(),
+            BtfType::Volatile(t) => t.size(),
+            BtfType::Restrict(t) => t.size(),
+            BtfType::Ptr(t) => t.size(),
+            BtfType::Typedef(t) => t.size(),
+            BtfType::Func(t) => t.size(),
+            BtfType::Int(t) => t.size(),
+            BtfType::Float(t) => t.size(),
+            BtfType::Enum(t) => t.size(),
+            BtfType::Array(t) => t.size(),
+            BtfType::Struct(t) => t.size(),
+            BtfType::Union(t) => t.size(),
+            BtfType::FuncProto(t) => t.size(),
+            BtfType::Var(t) => t.size(),
+            BtfType::DataSec(t) => t.size(),
+            BtfType::DeclTag(t) => t.size(),
+            BtfType::TypeTag(t) => t.size(),
+        }
+    }
+
+    fn next_type(&self) -> Option<u32> {
+        match self {
+            BtfType::Unknown => None,
+            BtfType::Fwd(t) => t.next_type(),
+            BtfType::Const(t) => t.next_type(),
+            BtfType::Volatile(t) => t.next_type(),
+            BtfType::Restrict(t) => t.next_type(),
+            BtfType::Ptr(t) => t.next_type(),
+            BtfType::Typedef(t) => t.next_type(),
+            BtfType::Func(t) => t.next_type(),
+            BtfType::Int(t) => t.next_type(),
+            BtfType::Float(t) => t.next_type(),
+            BtfType::Enum(t) => t.next_type(),
+            BtfType::Array(t) => t.next_type(),
+            BtfType::Struct(t) => t.next_type(),
+            BtfType::Union(t) => t.next_type(),
+            BtfType::FuncProto(t) => t.next_type(),
+            BtfType::Var(t) => t.next_type(),
+            BtfType::DataSec(t) => t.next_type(),
+            BtfType::DeclTag(t) => t.next_type(),
+            BtfType::TypeTag(t) => t.next_type(),
         }
     }
 
     pub(crate) fn type_info_size(&self) -> usize {
-        let ty_size = mem::size_of::<btf_type>();
-
-        use BtfType::*;
         match self {
-            Unknown => ty_size,
-            Fwd(_) | Const(_) | Volatile(_) | Restrict(_) | Ptr(_) | Typedef(_) | Func(_)
-            | Float(_) | TypeTag(_) => ty_size,
-            Int(_, _) => ty_size + mem::size_of::<u32>(),
-            Enum(ty, _) => ty_size + type_vlen(ty) * mem::size_of::<btf_enum>(),
-            Array(_, _) => ty_size + mem::size_of::<btf_array>(),
-            Struct(ty, _) => ty_size + type_vlen(ty) * mem::size_of::<btf_member>(),
-            Union(ty, _) => ty_size + type_vlen(ty) * mem::size_of::<btf_member>(),
-            FuncProto(ty, _) => ty_size + type_vlen(ty) * mem::size_of::<btf_param>(),
-            Var(_, _) => ty_size + mem::size_of::<btf_var>(),
-            DataSec(ty, _) => ty_size + type_vlen(ty) * mem::size_of::<btf_var_secinfo>(),
-            DeclTag(_, _) => ty_size + mem::size_of::<btf_decl_tag>(),
+            BtfType::Unknown => mem::size_of::<btf_type>(),
+            BtfType::Fwd(t) => mem::size_of_val(t),
+            BtfType::Const(t) => mem::size_of_val(t),
+            BtfType::Volatile(t) => mem::size_of_val(t),
+            BtfType::Restrict(t) => mem::size_of_val(t),
+            BtfType::Ptr(t) => mem::size_of_val(t),
+            BtfType::Typedef(t) => mem::size_of_val(t),
+            BtfType::Func(t) => mem::size_of_val(t),
+            BtfType::Int(t) => mem::size_of_val(t),
+            BtfType::Float(t) => mem::size_of_val(t),
+            BtfType::Enum(t) => mem::size_of_val(t),
+            BtfType::Array(t) => mem::size_of_val(t),
+            BtfType::Struct(t) => mem::size_of_val(t),
+            BtfType::Union(t) => mem::size_of_val(t),
+            BtfType::FuncProto(t) => mem::size_of_val(t),
+            BtfType::Var(t) => mem::size_of_val(t),
+            BtfType::DataSec(t) => mem::size_of_val(t),
+            BtfType::DeclTag(t) => mem::size_of_val(t),
+            BtfType::TypeTag(t) => mem::size_of_val(t),
         }
     }
 
-    pub(crate) fn btf_type(&self) -> Option<&btf_type> {
-        use BtfType::*;
-        Some(match self {
-            Unknown => return None,
-            Fwd(ty) => ty,
-            Const(ty) => ty,
-            Volatile(ty) => ty,
-            Restrict(ty) => ty,
-            Ptr(ty) => ty,
-            Typedef(ty) => ty,
-            Func(ty) => ty,
-            Int(ty, _) => ty,
-            Float(ty) => ty,
-            Enum(ty, _) => ty,
-            Array(ty, _) => ty,
-            Struct(ty, _) => ty,
-            Union(ty, _) => ty,
-            FuncProto(ty, _) => ty,
-            Var(ty, _) => ty,
-            DataSec(ty, _) => ty,
-            DeclTag(ty, _) => ty,
-            TypeTag(ty) => ty,
-        })
+    pub(crate) fn name_offset(&self) -> u32 {
+        match self {
+            BtfType::Unknown => 0,
+            BtfType::Fwd(t) => t.name_offset(),
+            BtfType::Const(t) => t.name_offset(),
+            BtfType::Volatile(t) => t.name_offset(),
+            BtfType::Restrict(t) => t.name_offset(),
+            BtfType::Ptr(t) => t.name_offset(),
+            BtfType::Typedef(t) => t.name_offset(),
+            BtfType::Func(t) => t.name_offset(),
+            BtfType::Int(t) => t.name_offset(),
+            BtfType::Float(t) => t.name_offset(),
+            BtfType::Enum(t) => t.name_offset(),
+            BtfType::Array(t) => t.name_offset(),
+            BtfType::Struct(t) => t.name_offset(),
+            BtfType::Union(t) => t.name_offset(),
+            BtfType::FuncProto(t) => t.name_offset(),
+            BtfType::Var(t) => t.name_offset(),
+            BtfType::DataSec(t) => t.name_offset(),
+            BtfType::DeclTag(t) => t.name_offset(),
+            BtfType::TypeTag(t) => t.name_offset(),
+        }
     }
 
-    pub(crate) fn info(&self) -> Option<u32> {
-        self.btf_type().map(|ty| ty.info)
-    }
-
-    pub(crate) fn name_offset(&self) -> Option<u32> {
-        self.btf_type().map(|ty| ty.name_off)
-    }
-
-    pub(crate) fn kind(&self) -> Result<Option<BtfKind>, BtfError> {
-        self.btf_type().map(type_kind).transpose()
+    pub(crate) fn kind(&self) -> BtfKind {
+        match self {
+            BtfType::Unknown => BtfKind::Unknown,
+            BtfType::Fwd(t) => t.kind(),
+            BtfType::Const(t) => t.kind(),
+            BtfType::Volatile(t) => t.kind(),
+            BtfType::Restrict(t) => t.kind(),
+            BtfType::Ptr(t) => t.kind(),
+            BtfType::Typedef(t) => t.kind(),
+            BtfType::Func(t) => t.kind(),
+            BtfType::Int(t) => t.kind(),
+            BtfType::Float(t) => t.kind(),
+            BtfType::Enum(t) => t.kind(),
+            BtfType::Array(t) => t.kind(),
+            BtfType::Struct(t) => t.kind(),
+            BtfType::Union(t) => t.kind(),
+            BtfType::FuncProto(t) => t.kind(),
+            BtfType::Var(t) => t.kind(),
+            BtfType::DataSec(t) => t.kind(),
+            BtfType::DeclTag(t) => t.kind(),
+            BtfType::TypeTag(t) => t.kind(),
+        }
     }
 
     pub(crate) fn is_composite(&self) -> bool {
-        matches!(self, BtfType::Struct(_, _) | BtfType::Union(_, _))
-    }
-
-    pub(crate) fn new_int(name_off: u32, size: u32, encoding: u32, offset: u32) -> BtfType {
-        let info = (BTF_KIND_INT) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.size = size;
-
-        let mut data = 0u32;
-        data |= (encoding & 0x0f) << 24;
-        data |= (offset & 0xff) << 16;
-        data |= (size * 8) & 0xff;
-        BtfType::Int(btf_type, data)
-    }
-
-    pub(crate) fn new_func(name_off: u32, proto: u32, linkage: btf_func_linkage) -> BtfType {
-        let mut info = (BTF_KIND_FUNC) << 24;
-        info |= (linkage as u32) & 0xFFFF;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = proto;
-        BtfType::Func(btf_type)
-    }
-
-    pub(crate) fn new_func_proto(params: Vec<btf_param>, return_type: u32) -> BtfType {
-        let mut info = (BTF_KIND_FUNC_PROTO) << 24;
-        info |= (params.len() as u32) & 0xFFFF;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = 0;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = return_type;
-        BtfType::FuncProto(btf_type, params)
-    }
-
-    pub(crate) fn new_var(name_off: u32, type_: u32, linkage: u32) -> BtfType {
-        let info = (BTF_KIND_VAR) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        let var = btf_var { linkage };
-        BtfType::Var(btf_type, var)
-    }
-
-    pub(crate) fn new_datasec(
-        name_off: u32,
-        variables: Vec<btf_var_secinfo>,
-        size: u32,
-    ) -> BtfType {
-        let mut info = (BTF_KIND_DATASEC) << 24;
-        info |= (variables.len() as u32) & 0xFFFF;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.size = size;
-        BtfType::DataSec(btf_type, variables)
-    }
-
-    pub(crate) fn new_float(name_off: u32, size: u32) -> BtfType {
-        let info = (BTF_KIND_FLOAT) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.size = size;
-        BtfType::Float(btf_type)
-    }
-
-    pub(crate) fn new_struct(name_off: u32, members: Vec<btf_member>, size: u32) -> BtfType {
-        let mut info = (BTF_KIND_STRUCT) << 24;
-        info |= (members.len() as u32) & 0xFFFF;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.size = size;
-        BtfType::Struct(btf_type, members)
-    }
-
-    pub(crate) fn new_enum(name_off: u32, members: Vec<btf_enum>) -> BtfType {
-        let mut info = (BTF_KIND_ENUM) << 24;
-        info |= (members.len() as u32) & 0xFFFF;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.size = 4;
-        BtfType::Enum(btf_type, members)
-    }
-
-    pub(crate) fn new_typedef(name_off: u32, type_: u32) -> BtfType {
-        let info = (BTF_KIND_TYPEDEF) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        BtfType::Typedef(btf_type)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn new_array(name_off: u32, type_: u32, index_type: u32, nelems: u32) -> BtfType {
-        let info = (BTF_KIND_ARRAY) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        let btf_array = btf_array {
-            type_,
-            index_type,
-            nelems,
-        };
-        BtfType::Array(btf_type, btf_array)
-    }
-
-    pub(crate) fn new_decl_tag(name_off: u32, type_: u32, component_idx: i32) -> BtfType {
-        let info = (BTF_KIND_DECL_TAG) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        let btf_decl_tag = btf_decl_tag { component_idx };
-        BtfType::DeclTag(btf_type, btf_decl_tag)
-    }
-
-    pub(crate) fn new_type_tag(name_off: u32, type_: u32) -> BtfType {
-        let info = (BTF_KIND_TYPE_TAG) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        BtfType::TypeTag(btf_type)
-    }
-
-    pub(crate) fn new_ptr(name_off: u32, type_: u32) -> BtfType {
-        let info = (BTF_KIND_PTR) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = name_off;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        BtfType::Ptr(btf_type)
-    }
-
-    pub(crate) fn new_const(type_: u32) -> BtfType {
-        let info = (BTF_KIND_CONST) << 24;
-        let mut btf_type = unsafe { std::mem::zeroed::<btf_type>() };
-        btf_type.name_off = 0;
-        btf_type.info = info;
-        btf_type.__bindgen_anon_1.type_ = type_;
-        BtfType::Const(btf_type)
+        matches!(self, BtfType::Struct(_) | BtfType::Union(_) )
     }
 }
 
@@ -504,7 +990,7 @@ pub(crate) fn types_are_compatible(
     let local_ty = local_btf.type_by_id(local_id)?;
     let target_ty = target_btf.type_by_id(target_id)?;
 
-    if local_ty.kind()? != target_ty.kind()? {
+    if local_ty.kind() != target_ty.kind() {
         return Ok(false);
     }
 
@@ -514,46 +1000,41 @@ pub(crate) fn types_are_compatible(
         let local_ty = local_btf.type_by_id(local_id)?;
         let target_ty = target_btf.type_by_id(target_id)?;
 
-        if local_ty.kind()? != target_ty.kind()? {
+        if local_ty.kind() != target_ty.kind() {
             return Ok(false);
         }
 
         use BtfType::*;
         match local_ty {
-            Unknown | Struct(_, _) | Union(_, _) | Enum(_, _) | Fwd(_) | Float(_) => {
+            Unknown | Struct(_) | Union(_) | Enum(_) | Fwd(_) | Float(_) => {
                 return Ok(true)
             }
-            Int(_, local_off) => {
-                let local_off = (local_off >> 16) & 0xFF;
-                if let Int(_, target_off) = target_ty {
-                    let target_off = (target_off >> 16) & 0xFF;
-                    return Ok(local_off == 0 && target_off == 0);
+            Int(local) => {
+                if let Int(target) = target_ty {
+                    return Ok(local.offset() == 0 && target.offset() == 0);
                 }
             }
-            Ptr(l_ty) => {
-                if let Ptr(t_ty) = target_ty {
-                    // Safety: union
-                    unsafe {
-                        local_id = l_ty.__bindgen_anon_1.type_;
-                        target_id = t_ty.__bindgen_anon_1.type_;
-                    }
+            Ptr(local) => {
+                if let Ptr(target) = target_ty {
+                    local_id = local.next_type().unwrap();
+                    target_id = target.next_type().unwrap();
                     continue;
                 }
             }
-            Array(_, l_ty) => {
-                if let Array(_, t_ty) = target_ty {
-                    local_id = l_ty.type_;
-                    target_id = t_ty.type_;
+            Array(local) => {
+                if let Array(target) = target_ty {
+                    local_id = local.next_type().unwrap();
+                    target_id = target.next_type().unwrap();
                     continue;
                 }
             }
-            FuncProto(l_ty, l_params) => {
-                if let FuncProto(t_ty, t_params) = target_ty {
-                    if l_params.len() != t_params.len() {
+            FuncProto(local) => {
+                if let FuncProto(target) = target_ty {
+                    if local.params.len() != target.params.len() {
                         return Ok(false);
                     }
 
-                    for (l_param, t_param) in l_params.iter().zip(t_params.iter()) {
+                    for (l_param, t_param) in local.params.iter().zip(target.params.iter()) {
                         let local_id = local_btf.resolve_type(l_param.type_)?;
                         let target_id = target_btf.resolve_type(t_param.type_)?;
                         if !types_are_compatible(local_btf, local_id, target_btf, target_id)? {
@@ -561,11 +1042,8 @@ pub(crate) fn types_are_compatible(
                         }
                     }
 
-                    // Safety: union
-                    unsafe {
-                        local_id = l_ty.__bindgen_anon_1.type_;
-                        target_id = t_ty.__bindgen_anon_1.type_;
-                    }
+                    local_id = local.next_type().unwrap();
+                    target_id = target.next_type().unwrap();
                     continue;
                 }
             }
@@ -592,13 +1070,13 @@ pub(crate) fn fields_are_compatible(
             return Ok(true);
         }
 
-        if local_ty.kind()? != target_ty.kind()? {
+        if local_ty.kind() != target_ty.kind() {
             return Ok(false);
         }
 
         use BtfType::*;
         match local_ty {
-            Fwd(_) | Enum(_, _) => {
+            Fwd(_) | Enum(_) => {
                 let flavorless_name =
                     |name: &str| name.split_once("___").map_or(name, |x| x.0).to_string();
 
@@ -607,19 +1085,17 @@ pub(crate) fn fields_are_compatible(
 
                 return Ok(local_name == target_name);
             }
-            Int(_, local_off) => {
-                let local_off = (local_off >> 16) & 0xFF;
-                if let Int(_, target_off) = target_ty {
-                    let target_off = (target_off >> 16) & 0xFF;
-                    return Ok(local_off == 0 && target_off == 0);
+            Int(local) => {
+                if let Int(target) = target_ty {
+                    return Ok(local.offset() == 0 && target.offset() == 0);
                 }
             }
             Float(_) => return Ok(true),
             Ptr(_) => return Ok(true),
-            Array(_, l_ty) => {
-                if let Array(_, t_ty) = target_ty {
-                    local_id = l_ty.type_;
-                    target_id = t_ty.type_;
+            Array(local) => {
+                if let Array(target) = target_ty {
+                    local_id = local.next_type();
+                    target_id = target.next_type();
 
                     continue;
                 }
@@ -651,6 +1127,10 @@ impl std::fmt::Debug for btf_type__bindgen_ty_1 {
     }
 }
 
+fn bytes_of<T>(val: &T) -> &[u8] {
+    // Safety: all btf types are POD
+    unsafe { crate::util::bytes_of(val) }
+}
 #[cfg(test)]
 mod tests {
     use crate::generated::BTF_INT_SIGNED;
