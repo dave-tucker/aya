@@ -575,8 +575,9 @@ impl From<NlAttrError> for io::Error {
 }
 
 unsafe fn request_attributes<T>(req: &mut T, msg_len: usize) -> &mut [u8] {
-    let attrs_addr = align_to(req as *const _ as usize + msg_len, NLMSG_ALIGNTO as usize);
-    let attrs_end = req as *const _ as usize + mem::size_of::<T>();
+    let req_ptr = req as *mut _ as usize;
+    let attrs_addr = align_to(req_ptr + msg_len, NLMSG_ALIGNTO as usize);
+    let attrs_end = req_ptr + mem::size_of::<T>();
     slice::from_raw_parts_mut(attrs_addr as *mut u8, attrs_end - attrs_addr)
 }
 
