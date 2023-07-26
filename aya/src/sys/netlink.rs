@@ -3,9 +3,9 @@ use thiserror::Error;
 
 use libc::{
     close, getsockname, nlattr, nlmsgerr, nlmsghdr, recv, send, setsockopt, sockaddr_nl, socket,
-    AF_NETLINK, AF_UNSPEC, ETH_P_ALL, IFLA_XDP, NETLINK_EXT_ACK, NETLINK_ROUTE, NLA_ALIGNTO,
-    NLA_F_NESTED, NLA_TYPE_MASK, NLMSG_DONE, NLMSG_ERROR, NLM_F_ACK, NLM_F_CREATE, NLM_F_DUMP,
-    NLM_F_ECHO, NLM_F_EXCL, NLM_F_MULTI, NLM_F_REQUEST, RTM_DELTFILTER, RTM_GETTFILTER,
+    AF_NETLINK, AF_UNSPEC, ETH_P_ALL, IFLA_XDP, NETLINK_CAP_ACK, NETLINK_EXT_ACK, NETLINK_ROUTE,
+    NLA_ALIGNTO, NLA_F_NESTED, NLA_TYPE_MASK, NLMSG_DONE, NLMSG_ERROR, NLM_F_ACK, NLM_F_CREATE,
+    NLM_F_DUMP, NLM_F_ECHO, NLM_F_EXCL, NLM_F_MULTI, NLM_F_REQUEST, RTM_DELTFILTER, RTM_GETTFILTER,
     RTM_NEWQDISC, RTM_NEWTFILTER, RTM_SETLINK, SOCK_RAW, SOL_NETLINK,
 };
 
@@ -19,6 +19,7 @@ use crate::{
     util::tc_handler_make,
 };
 
+const NLMSGERR_ATTR_MSG: u16 = 0x01;
 const NLA_HDR_LEN: usize = align_to(mem::size_of::<nlattr>(), NLA_ALIGNTO as usize);
 
 // Safety: marking this as unsafe overall because of all the pointer math required to comply with
@@ -62,9 +63,7 @@ pub(crate) unsafe fn netlink_set_xdp_fd(
     req.header.nlmsg_len += align_to(nla_len, NLA_ALIGNTO as usize) as u32;
 
     sock.send(&bytes_of(&req)[..req.header.nlmsg_len as usize])?;
-
     sock.recv()?;
-
     Ok(())
 }
 
@@ -270,13 +269,29 @@ impl NetlinkSocket {
         let enable = 1i32;
         // Safety: libc wrapper
         unsafe {
-            setsockopt(
+            // Set NETLINK_EXT_ACK to get extended attributes.
+            if setsockopt(
                 sock,
                 SOL_NETLINK,
                 NETLINK_EXT_ACK,
                 &enable as *const _ as *const _,
                 mem::size_of::<i32>() as u32,
-            )
+            ) < 0
+            {
+                return Err(io::Error::last_os_error());
+            };
+
+            // Set NETLINK_CAP_ACK to avoid getting copies of request payload.
+            if setsockopt(
+                sock,
+                SOL_NETLINK,
+                NETLINK_CAP_ACK,
+                &enable as *const _ as *const _,
+                mem::size_of::<i32>() as u32,
+            ) < 0
+            {
+                return Err(io::Error::last_os_error());
+            };
         };
 
         // Safety: sockaddr_nl is POD so this is safe
@@ -330,7 +345,23 @@ impl NetlinkSocket {
                             // this is an ACK
                             continue;
                         }
-                        return Err(io::Error::from_raw_os_error(-err.error));
+                        let attrs = parse_attrs(&message.data)?;
+                        let err_msg = attrs.get(&NLMSGERR_ATTR_MSG).and_then(|msg| {
+                            CStr::from_bytes_with_nul(msg.data)
+                                .ok()
+                                .map(|s| s.to_string_lossy().into_owned())
+                        });
+                        match err_msg {
+                            Some(err_msg) => {
+                                return Err(io::Error::new(
+                                    io::ErrorKind::Other,
+                                    format!("netlink error: {}", err_msg),
+                                ));
+                            }
+                            None => {
+                                return Err(io::Error::from_raw_os_error(-err.error));
+                            }
+                        }
                     }
                     NLMSG_DONE => break 'out,
                     _ => messages.push(message),
@@ -377,7 +408,7 @@ impl NetlinkMessage {
                 ));
             }
             (
-                Vec::new(),
+                buf[data_offset + mem::size_of::<nlmsgerr>()..msg_len].to_vec(),
                 // Safety: nlmsgerr is POD so read is safe
                 Some(unsafe {
                     ptr::read_unaligned(buf[data_offset..].as_ptr() as *const nlmsgerr)
