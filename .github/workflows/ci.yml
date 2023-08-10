@@ -30,6 +30,9 @@ jobs:
         with:
           tool: cargo-hack,taplo-cli
 
+      - name: Check Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v9
+
       - run: taplo fmt --check
 
       - name: Check formatting
