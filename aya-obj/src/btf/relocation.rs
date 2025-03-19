@@ -13,8 +13,8 @@ use object::SectionIndex;
 use crate::{
     Function, Object,
     btf::{
-        Array, Btf, BtfError, BtfMember, BtfType, IntEncoding, MAX_SPEC_LEN, Struct, Union,
-        fields_are_compatible, types_are_compatible,
+        Array, BtfError, BtfMember, BtfType, CompositeBtf, IntEncoding, MAX_SPEC_LEN, Struct,
+        Union, fields_are_compatible, types_are_compatible,
     },
     generated::{
         BPF_ALU, BPF_ALU64, BPF_B, BPF_CALL, BPF_DW, BPF_H, BPF_JMP, BPF_K, BPF_LD, BPF_LDX,
@@ -219,7 +219,7 @@ impl Relocation {
 
 impl Object {
     /// Relocates programs inside this object file with loaded BTF info.
-    pub fn relocate_btf(&mut self, target_btf: &Btf) -> Result<(), BtfRelocationError> {
+    pub fn relocate_btf(&mut self, target_btf: &CompositeBtf) -> Result<(), BtfRelocationError> {
         let (local_btf, btf_ext) = match (&self.btf, &self.btf_ext) {
             (Some(btf), Some(btf_ext)) => (btf, btf_ext),
             _ => return Ok(()),
@@ -299,8 +299,8 @@ fn relocate_btf_functions<'target>(
     section_index: &SectionIndex,
     functions: &mut BTreeMap<(usize, u64), Function>,
     relos: &[Relocation],
-    local_btf: &Btf,
-    target_btf: &'target Btf,
+    local_btf: &CompositeBtf,
+    target_btf: &'target CompositeBtf,
     candidates_cache: &mut HashMap<u32, Vec<Candidate<'target>>>,
 ) -> Result<(), RelocationError> {
     let mut last_function_opt: Option<&mut Function> = None;
@@ -405,7 +405,7 @@ fn flavorless_name(name: &str) -> &str {
 fn find_candidates<'target>(
     local_ty: &BtfType,
     local_name: &str,
-    target_btf: &'target Btf,
+    target_btf: &'target CompositeBtf,
 ) -> Result<Vec<Candidate<'target>>, BtfError> {
     let mut candidates = Vec::new();
     let local_name = flavorless_name(local_name);
@@ -658,7 +658,7 @@ fn match_member<'target>(
 
 #[derive(Debug)]
 struct AccessSpec<'a> {
-    btf: &'a Btf,
+    btf: &'a CompositeBtf,
     root_type_id: u32,
     parts: Vec<usize>,
     accessors: Vec<Accessor>,
@@ -866,7 +866,7 @@ struct Accessor {
 #[derive(Debug)]
 struct Candidate<'a> {
     name: String,
-    btf: &'a Btf,
+    btf: &'a CompositeBtf,
     _ty: &'a BtfType,
     type_id: u32,
 }
@@ -923,7 +923,7 @@ impl ComputedRelocation {
         function: &mut Function,
         rel: &Relocation,
         local_btf: &Btf,
-        target_btf: &Btf,
+        target_btf: &CompositeBtf,
     ) -> Result<(), RelocationError> {
         let instructions = &mut function.instructions;
         let num_instructions = instructions.len();

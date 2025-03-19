@@ -5,9 +5,8 @@ use alloc::{
     vec,
     vec::Vec,
 };
-use core::{ffi::CStr, mem, ptr};
-
 use bytes::BufMut as _;
+use core::{ffi::CStr, mem, ptr};
 use log::debug;
 use object::{Endianness, SectionIndex};
 
@@ -229,6 +228,45 @@ impl BtfFeatures {
     /// Returns true if the BTF_KIND_ENUM64 is supported.
     pub fn btf_enum64(&self) -> bool {
         self.btf_enum64
+    }
+}
+
+#[derive(Clone, Debug)]
+/// A collection of BPF Type Format metadata objects.
+pub(crate) struct CompositeBtf<'a> {
+    base: &'a Btf,
+    module: Option<&'a Btf>,
+}
+
+impl CompositeBtf<'_> {
+    pub(crate) fn type_by_id(&self, type_id: u32) -> Result<&BtfType, BtfError> {
+        self.base.type_by_id(type_id).or_else(|e| {
+            self.module
+                .as_ref()
+                .ok_or(e)
+                .and_then(|m| m.type_by_id(type_id))
+        })
+    }
+
+    pub(crate) fn resolve_type(&self, root_type_id: u32) -> Result<u32, BtfError> {
+        self.base.resolve_type(root_type_id).or_else(|e| {
+            self.module
+                .as_ref()
+                .ok_or(e)
+                .and_then(|m| m.resolve_type(root_type_id))
+        })
+    }
+
+    pub(crate) fn type_name(&self, ty: &BtfType) -> Result<Cow<'_, str>, BtfError> {
+        self.base
+            .type_name(ty)
+            .or_else(|e| self.module.as_ref().ok_or(e).and_then(|m| m.type_name(ty)))
+    }
+
+    pub(crate) fn types(&self) -> impl Iterator<Item = &BtfType> {
+        self.base
+            .types()
+            .chain(self.module.as_ref().into_iter().flat_map(|m| m.types()))
     }
 }
 

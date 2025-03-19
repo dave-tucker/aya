@@ -1,7 +1,9 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    fs, io,
+    fs,
+    hash::Hash,
+    io,
     os::fd::{AsFd as _, AsRawFd as _},
     path::{Path, PathBuf},
     sync::{Arc, LazyLock},
@@ -17,6 +19,7 @@ use aya_obj::{
     relocation::EbpfRelocationError,
 };
 use log::{debug, warn};
+use object::Endianness;
 use thiserror::Error;
 
 use crate::{
@@ -125,6 +128,7 @@ pub struct EbpfLoader<'a> {
     extensions: HashSet<&'a str>,
     verifier_log_level: VerifierLogLevel,
     allow_unsupported_maps: bool,
+    kernel_module_btf: HashMap<String, Btf>,
 }
 
 /// Builder style API for advanced loading of eBPF programs.
@@ -163,6 +167,7 @@ impl<'a> EbpfLoader<'a> {
             extensions: HashSet::new(),
             verifier_log_level: VerifierLogLevel::default(),
             allow_unsupported_maps: false,
+            kernel_module_btf: HashMap::new(),
         }
     }
 
@@ -343,6 +348,34 @@ impl<'a> EbpfLoader<'a> {
         self
     }
 
+    /// Provides a BTF object for a kernel module.
+    ///
+    /// Kernel module BTF is required when using tracing programs that are to
+    /// be attached to a symbol in a kernel module. By default the loader will
+    /// attempt to find the module BTF at load time by looking up symbols from
+    /// /proc/kallysms, finding the target kernel module, and looking for its
+    /// BTF in well-known locations on the filesystem. This function allows
+    /// the caller to provide the BTF object directly to the loader in cases
+    /// where the BTF in environments where automatic BTF discovery is not
+    /// possible.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use aya::{EbpfLoader, Btf};
+    /// use std::fs;
+    ///     
+    /// let btf = Btf::parse_file("/path/to/my_kmod.btf", Default::default()).unwrap();
+    /// let bpf = EbpfLoader::new()
+    ///     .kernel_module_btf("my_kmod", btf)
+    ///     .load_file("file.o")?;
+    /// # Ok::<(), aya::EbpfError>(())
+    /// ```
+    pub fn kernel_module_btf(&mut self, module: &'a str, btf: Btf) -> &mut Self {
+        self.kernel_module_btf.insert(module.to_string(), btf);
+        self
+    }
+
     /// Loads eBPF bytecode from a file.
     ///
     /// # Examples
@@ -386,6 +419,7 @@ impl<'a> EbpfLoader<'a> {
             extensions,
             verifier_log_level,
             allow_unsupported_maps,
+            kernel_module_btf,
         } = self;
         let mut obj = Object::parse(data)?;
         obj.patch_map_data(globals.clone())?;
@@ -399,15 +433,29 @@ impl<'a> EbpfLoader<'a> {
                         for program in obj.programs.values() {
                             match program.section {
                                 ProgramSection::Extension
-                                | ProgramSection::FEntry { sleepable: _ }
-                                | ProgramSection::FExit { sleepable: _ }
+                                | ProgramSection::FEntry {
+                                    sleepable: _,
+                                    fn_name: _,
+                                    kernel_module: _,
+                                }
+                                | ProgramSection::FExit {
+                                    sleepable: _,
+                                    fn_name: _,
+                                    kernel_module: _,
+                                }
                                 | ProgramSection::Lsm { sleepable: _ }
                                 | ProgramSection::BtfTracePoint
                                 | ProgramSection::Iter { sleepable: _ } => {
                                     return Err(EbpfError::BtfError(err));
                                 }
-                                ProgramSection::KRetProbe
-                                | ProgramSection::KProbe
+                                ProgramSection::KRetProbe {
+                                    fn_name: _,
+                                    kernel_module: _,
+                                }
+                                | ProgramSection::KProbe {
+                                    fn_name: _,
+                                    kernel_module: _,
+                                }
                                 | ProgramSection::UProbe { sleepable: _ }
                                 | ProgramSection::URetProbe { sleepable: _ }
                                 | ProgramSection::TracePoint
@@ -448,6 +496,24 @@ impl<'a> EbpfLoader<'a> {
         } else {
             None
         };
+
+        if kernel_module_btf.is_empty() {
+            for program in obj.programs.values() {
+                match &program.section {
+                    ProgramSection::KRetProbe { kernel_module, .. }
+                    | ProgramSection::KProbe { kernel_module, .. }
+                    | ProgramSection::FEntry { kernel_module, .. }
+                    | ProgramSection::FExit { kernel_module, .. } => {
+                        if let Some(kernel_module) = kernel_module {
+                            let path = Path::new("/sys/kernel/btf").join(kernel_module);
+                            let btf = Btf::parse_file(&path, Endianness::default())?;
+                            kernel_module_btf.insert(kernel_module.clone(), btf);
+                        }
+                    }
+                    _ => (),
+                }
+            }
+        }
 
         if let Some(btf) = &btf {
             obj.relocate_btf(btf)?;
@@ -532,11 +598,17 @@ impl<'a> EbpfLoader<'a> {
                     })
                 } else {
                     match &section {
-                        ProgramSection::KProbe => Program::KProbe(KProbe {
+                        ProgramSection::KProbe {
+                            fn_name: _,
+                            kernel_module: _,
+                        } => Program::KProbe(KProbe {
                             data: ProgramData::new(prog_name, obj, btf_fd, *verifier_log_level),
                             kind: ProbeKind::KProbe,
                         }),
-                        ProgramSection::KRetProbe => Program::KProbe(KProbe {
+                        ProgramSection::KRetProbe {
+                            fn_name: _,
+                            kernel_module: _,
+                        } => Program::KProbe(KProbe {
                             data: ProgramData::new(prog_name, obj, btf_fd, *verifier_log_level),
                             kind: ProbeKind::KRetProbe,
                         }),
@@ -647,7 +719,11 @@ impl<'a> EbpfLoader<'a> {
                         ProgramSection::BtfTracePoint => Program::BtfTracePoint(BtfTracePoint {
                             data: ProgramData::new(prog_name, obj, btf_fd, *verifier_log_level),
                         }),
-                        ProgramSection::FEntry { sleepable } => {
+                        ProgramSection::FEntry {
+                            sleepable,
+                            fn_name: _,
+                            kernel_module: _,
+                        } => {
                             let mut data =
                                 ProgramData::new(prog_name, obj, btf_fd, *verifier_log_level);
                             if *sleepable {
@@ -655,7 +731,11 @@ impl<'a> EbpfLoader<'a> {
                             }
                             Program::FEntry(FEntry { data })
                         }
-                        ProgramSection::FExit { sleepable } => {
+                        ProgramSection::FExit {
+                            sleepable,
+                            fn_name: _,
+                            kernel_module: _,
+                        } => {
                             let mut data =
                                 ProgramData::new(prog_name, obj, btf_fd, *verifier_log_level);
                             if *sleepable {

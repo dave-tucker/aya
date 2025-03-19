@@ -1,14 +1,14 @@
 //! Object file loading, parsing, and relocation.
 
 use alloc::{
-    borrow::ToOwned as _,
+    borrow::ToOwned,
     collections::BTreeMap,
     ffi::CString,
     string::{String, ToString as _},
     vec,
     vec::Vec,
 };
-use core::{ffi::CStr, mem, ptr, slice::from_raw_parts_mut, str::FromStr};
+use core::{cell::LazyCell, ffi::CStr, mem, ptr, slice::from_raw_parts_mut, str::FromStr};
 
 use log::debug;
 use object::{
@@ -25,6 +25,7 @@ use crate::{
         BPF_CALL, BPF_F_RDONLY_PROG, BPF_JMP, BPF_K, bpf_func_id::*, bpf_insn, bpf_map_info,
         bpf_map_type::BPF_MAP_TYPE_ARRAY,
     },
+    kallsysms::{KAllSyms, KAllSymsError},
     maps::{BtfMap, BtfMapDef, LegacyMap, MINIMUM_MAP_SIZE, Map, PinningType, bpf_map_def},
     programs::{
         CgroupSockAddrAttachType, CgroupSockAttachType, CgroupSockoptAttachType, XdpAttachType,
@@ -239,8 +240,14 @@ pub struct Function {
 #[derive(Debug, Clone)]
 #[expect(missing_docs)]
 pub enum ProgramSection {
-    KRetProbe,
-    KProbe,
+    KRetProbe {
+        fn_name: Option<String>,
+        kernel_module: Option<String>,
+    },
+    KProbe {
+        fn_name: Option<String>,
+        kernel_module: Option<String>,
+    },
     UProbe {
         sleepable: bool,
     },
@@ -277,9 +284,13 @@ pub enum ProgramSection {
     BtfTracePoint,
     FEntry {
         sleepable: bool,
+        fn_name: Option<String>,
+        kernel_module: Option<String>,
     },
     FExit {
         sleepable: bool,
+        fn_name: Option<String>,
+        kernel_module: Option<String>,
     },
     FlowDissector,
     Extension,
@@ -311,9 +322,26 @@ impl FromStr for ProgramSection {
         };
         let kind = next()?;
 
+        // TODO: Avoid unwrapping here
+        let kallsysms = LazyCell::new(|| KAllSyms::new().unwrap());
+
         Ok(match kind {
-            "kprobe" => KProbe,
-            "kretprobe" => KRetProbe,
+            "kprobe" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                KProbe {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                }
+            }
+            "kretprobe" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                KRetProbe {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                }
+            }
             "uprobe" => UProbe { sleepable: false },
             "uprobe.s" => UProbe { sleepable: true },
             "uretprobe" => URetProbe { sleepable: false },
@@ -436,11 +464,42 @@ impl FromStr for ProgramSection {
             "raw_tp" | "raw_tracepoint" => RawTracePoint,
             "lsm" => Lsm { sleepable: false },
             "lsm.s" => Lsm { sleepable: true },
-            "fentry" => FEntry { sleepable: false },
-            "fentry.s" => FEntry { sleepable: true },
-            "fexit" => FExit { sleepable: false },
-            "fexit.s" => FExit { sleepable: true },
-            "flow_dissector" => FlowDissector,
+            "fentry" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                FEntry {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                    sleepable: false,
+                }
+            }
+            "fentry.s" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                FEntry {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                    sleepable: true,
+                }
+            }
+            "fexit" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                FExit {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                    sleepable: false,
+                }
+            }
+            "fexit.s" => {
+                let fn_name = next()?;
+                let kernel_module = (*kallsysms).get(fn_name).and_then(|s| s.module_name());
+                FExit {
+                    fn_name: Some(fn_name.to_owned()),
+                    kernel_module: kernel_module.map(ToOwned::to_owned),
+                    sleepable: true,
+                }
+            }
             "freplace" => Extension,
             "sk_lookup" => SkLookup,
             "iter" => Iter { sleepable: false },
@@ -1007,6 +1066,9 @@ pub enum ParseError {
     /// No BTF parsed for object
     #[error("no BTF parsed for object")]
     NoBTF,
+
+    #[error(transparent)]
+    KAllSyms(#[from] KAllSymsError),
 }
 
 /// Invalid bindings to the bpf type from the parsed/received value.
@@ -1701,7 +1763,7 @@ mod tests {
         assert_matches!(prog_foo, Program {
             license,
             kernel_version: None,
-            section: ProgramSection::KProbe,
+            section: ProgramSection::KProbe {..},
             ..
         } => assert_eq!(license.to_str().unwrap(), "GPL"));
 
@@ -1765,7 +1827,7 @@ mod tests {
         assert_matches!(prog_foo, Program {
             license,
             kernel_version: None,
-            section: ProgramSection::KProbe,
+            section: ProgramSection::KProbe {..},
             ..
         } => assert_eq!(license.to_str().unwrap(), "GPL"));
         assert_matches!(
@@ -1783,7 +1845,7 @@ mod tests {
         assert_matches!(prog_bar, Program {
             license,
             kernel_version: None,
-            section: ProgramSection::KProbe ,
+            section: ProgramSection::KProbe {..},
             ..
         } => assert_eq!(license.to_str().unwrap(), "GPL"));
         assert_matches!(
@@ -1915,7 +1977,7 @@ mod tests {
         assert_matches!(
             obj.programs.get("foo"),
             Some(Program {
-                section: ProgramSection::KProbe,
+                section: ProgramSection::KProbe { .. },
                 ..
             })
         );

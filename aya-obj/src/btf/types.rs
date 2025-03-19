@@ -5,7 +5,7 @@ use core::{fmt::Display, mem, ptr};
 
 use object::Endianness;
 
-use crate::btf::{Btf, BtfError, MAX_RESOLVE_DEPTH};
+use crate::btf::{Btf, BtfError, CompositeBtf, MAX_RESOLVE_DEPTH};
 
 #[derive(Clone, Debug)]
 pub enum BtfType {
@@ -1438,7 +1438,7 @@ fn type_vlen(info: u32) -> usize {
 pub(crate) fn types_are_compatible(
     local_btf: &Btf,
     root_local_id: u32,
-    target_btf: &Btf,
+    target_btf: &CompositeBtf,
     root_target_id: u32,
 ) -> Result<bool, BtfError> {
     let mut local_id = root_local_id;
