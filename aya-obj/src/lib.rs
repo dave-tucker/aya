@@ -80,6 +80,8 @@ pub mod btf;
     unsafe_op_in_unsafe_fn
 )]
 pub mod generated;
+#[cfg(feature = "std")]
+pub mod kallsysms;
 pub mod links;
 pub mod maps;
 pub mod obj;
