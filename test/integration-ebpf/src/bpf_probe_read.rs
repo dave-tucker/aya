@@ -7,6 +7,8 @@ use aya_ebpf::{
     maps::Array,
     programs::ProbeContext,
 };
+#[cfg(not(test))]
+extern crate ebpf_panic;
 use integration_common::bpf_probe_read::{RESULT_BUF_LEN, TestResult};
 
 fn read_str_bytes(
@@ -70,10 +72,4 @@ pub fn test_bpf_probe_read_kernel_str_bytes(ctx: ProbeContext) {
             .map(|buf| buf.as_ptr()),
         ctx.arg::<usize>(0),
     );
-}
-
-#[cfg(not(test))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
 }
