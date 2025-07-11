@@ -836,8 +836,8 @@ pub(crate) fn is_probe_read_kernel_supported() -> bool {
     bpf_prog_load(&mut attr).is_ok()
 }
 
-pub(crate) fn is_perf_link_supported() -> bool {
-    with_trivial_prog(ProgramType::TracePoint, |attr| {
+pub(crate) fn is_bpf_link_supported(program_type: ProgramType) -> bool {
+    with_trivial_prog(program_type, |attr| {
         if let Ok(fd) = bpf_prog_load(attr) {
             let fd = fd.as_fd();
             // Uses an invalid target FD so we get EBADF if supported.
@@ -1274,7 +1274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_perf_link_supported() {
+    fn test_bpf_link_supported() {
         override_syscall(|call| match call {
             Syscall::Ebpf {
                 cmd: bpf_cmd::BPF_LINK_CREATE,
@@ -1282,7 +1282,7 @@ mod tests {
             } => Err((-1, io::Error::from_raw_os_error(EBADF))),
             _ => Ok(crate::MockableFd::mock_signed_fd().into()),
         });
-        let supported = is_perf_link_supported();
+        let supported = is_bpf_link_supported(ProgramType::TracePoint);
         assert!(supported);
 
         override_syscall(|call| match call {
@@ -1292,7 +1292,7 @@ mod tests {
             } => Err((-1, io::Error::from_raw_os_error(EINVAL))),
             _ => Ok(crate::MockableFd::mock_signed_fd().into()),
         });
-        let supported = is_perf_link_supported();
+        let supported = is_bpf_link_supported(ProgramType::TracePoint);
         assert!(!supported);
     }
 

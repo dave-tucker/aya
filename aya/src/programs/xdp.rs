@@ -25,7 +25,7 @@ use crate::{
     },
     sys::{
         LinkTarget, NetlinkError, SyscallError, bpf_link_create, bpf_link_get_info_by_fd,
-        bpf_link_update, netlink_set_xdp_fd,
+        bpf_link_update, is_bpf_link_supported, netlink_set_xdp_fd,
     },
     util::KernelVersion,
 };
@@ -136,7 +136,7 @@ impl Xdp {
         let prog_fd = self.fd()?;
         let prog_fd = prog_fd.as_fd();
 
-        if KernelVersion::at_least(5, 9, 0) {
+        if is_bpf_link_supported(ProgramType::Xdp) {
             // Unwrap safety: the function starts with `self.fd()?` that will succeed if and only
             // if the program has been loaded, i.e. there is an fd. We get one by:
             // - Using `Xdp::from_pin` that sets `expected_attach_type`

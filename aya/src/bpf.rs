@@ -29,12 +29,11 @@ use crate::{
         UProbe, Xdp,
     },
     sys::{
-        bpf_load_btf, is_bpf_cookie_supported, is_bpf_global_data_supported,
+        bpf_load_btf, is_bpf_cookie_supported, is_bpf_global_data_supported, is_bpf_link_supported,
         is_btf_datasec_supported, is_btf_decl_tag_supported, is_btf_enum64_supported,
         is_btf_float_supported, is_btf_func_global_supported, is_btf_func_supported,
-        is_btf_supported, is_btf_type_tag_supported, is_perf_link_supported,
-        is_probe_read_kernel_supported, is_prog_id_supported, is_prog_name_supported,
-        retry_with_verifier_logs,
+        is_btf_supported, is_btf_type_tag_supported, is_probe_read_kernel_supported,
+        is_prog_id_supported, is_prog_name_supported, retry_with_verifier_logs,
     },
     util::{bytes_of, bytes_of_slice, nr_cpus, page_size},
 };
@@ -77,7 +76,7 @@ fn detect_features() -> Features {
     let f = Features::new(
         is_prog_name_supported(),
         is_probe_read_kernel_supported(),
-        is_perf_link_supported(),
+        is_bpf_link_supported(ProgramType::TracePoint),
         is_bpf_global_data_supported(),
         is_bpf_cookie_supported(),
         is_prog_id_supported(BPF_MAP_TYPE_CPUMAP),
