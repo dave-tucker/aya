@@ -6,16 +6,15 @@
 
 use std::{
     fs::File,
-    io::{BufWriter, Read, Write as _},
+    io::{BufWriter, Write as _},
     path::PathBuf,
 };
 
 use anyhow::{Context as _, anyhow};
 use clap::Parser;
 use object::{Object, ObjectSection, ObjectSymbol, Section};
-use test_distro::resolve_modules_dir;
+use test_distro::{read_to_end, resolve_modules_dir};
 use walkdir::WalkDir;
-use xz2::read::XzDecoder;
 
 #[derive(Parser)]
 struct Args {
@@ -42,50 +41,35 @@ fn main() -> anyhow::Result<()> {
     let mut output = BufWriter::new(&f);
     for entry in WalkDir::new(modules_dir) {
         let entry = entry.context("failed to read entry in walkdir")?;
-        if entry.file_type().is_file() {
-            let path = entry.path();
-
-            let module_name = path
-                .file_name()
-                .ok_or_else(|| anyhow!("{} does not have a file name", path.display()))?
-                .to_str()
-                .ok_or_else(|| anyhow!("{} is not valid utf-8", path.display()))?;
-
-            let (module_name, compressed) =
-                if let Some(module_name) = module_name.strip_suffix(".xz") {
-                    (module_name, true)
-                } else {
-                    (module_name, false)
-                };
-
-            let module_name = if let Some(module_name) = module_name.strip_suffix(".ko") {
-                module_name
-            } else {
-                // Not a kernel module
-                continue;
-            };
-
-            let mut f =
-                File::open(path).with_context(|| format!("failed to open: {}", path.display()))?;
-            let stat = f
-                .metadata()
-                .with_context(|| format!("failed to get metadata for {}", path.display()))?;
-
-            if compressed {
-                let mut decoder = XzDecoder::new(f);
-                // We don't know the size of the decompressed data, so we assume it's
-                // no more than twice the size of the compressed data.
-                let mut decompressed = Vec::with_capacity(stat.len() as usize * 2);
-                decoder.read_to_end(&mut decompressed)?;
-                read_aliases_from_module(&decompressed, module_name, &mut output)
-            } else {
-                let mut buf = Vec::with_capacity(stat.len() as usize);
-                f.read_to_end(&mut buf)
-                    .with_context(|| format!("failed to read: {}", path.display()))?;
-                read_aliases_from_module(&buf, module_name, &mut output)
-            }
-            .with_context(|| format!("failed to read aliases from module {}", path.display()))?;
+        if !entry.file_type().is_file() {
+            continue;
         }
+        let path = entry.path();
+
+        let module_name = path
+            .file_name()
+            .ok_or_else(|| anyhow!("{} does not have a file name", path.display()))?
+            .to_str()
+            .ok_or_else(|| anyhow!("{} is not valid utf-8", path.display()))?;
+
+        let (module_name, compressed) = if let Some(module_name) = module_name.strip_suffix(".xz") {
+            (module_name, true)
+        } else {
+            (module_name, false)
+        };
+
+        let module_name = if let Some(module_name) = module_name.strip_suffix(".ko") {
+            module_name
+        } else {
+            // Not a kernel module
+            continue;
+        };
+
+        let contents = read_to_end(path, compressed)
+            .with_context(|| format!("read_to_end({})", path.display()))?;
+
+        read_aliases_from_module(&contents, module_name, &mut output)
+            .with_context(|| format!("failed to read aliases from module {}", path.display()))?;
     }
     Ok(())
 }
@@ -126,14 +110,14 @@ fn read_aliases_from_module(
             let end = start + s.size() as usize;
             let sym_data = &data[start..end];
             let cstr = std::ffi::CStr::from_bytes_with_nul(sym_data)
-                .with_context(|| format!("failed to convert {:?} to cstr", sym_data))?;
+                .with_context(|| format!("failed to convert {sym_data:?} to cstr"))?;
             let sym_str = cstr
                 .to_str()
-                .with_context(|| format!("failed to convert {:?} to str", cstr))?;
+                .with_context(|| format!("failed to convert {cstr:?} to str"))?;
             let alias = sym_str
                 .strip_prefix("alias=")
-                .with_context(|| format!("failed to strip prefix 'alias=' from {}", sym_str))?;
-            writeln!(output, "alias {} {}", alias, module_name).expect("write");
+                .with_context(|| format!("failed to strip prefix 'alias=' from {sym_str}"))?;
+            writeln!(output, "alias {alias} {module_name}").expect("write");
         }
     }
     Ok(())

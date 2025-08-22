@@ -3,17 +3,13 @@
 //! This implementation is incredibly naive and is only designed to work within
 //! the constraints of the test environment. Not for production use.
 
-use std::{
-    fs::File,
-    io::{BufRead as _, Read as _},
-    path::Path,
-};
+use std::{fs::File, io::BufRead as _, path::Path};
 
 use anyhow::{Context as _, anyhow, bail};
 use clap::Parser;
 use glob::glob;
 use nix::kmod::init_module;
-use test_distro::resolve_modules_dir;
+use test_distro::{read_to_end, resolve_modules_dir};
 
 macro_rules! output {
     ($quiet:expr, $($arg:tt)*) => {
@@ -55,34 +51,20 @@ fn try_main(quiet: bool, name: String) -> anyhow::Result<()> {
         module
     );
     let module_path = glob(&pattern)
-        .with_context(|| format!("failed to glob: {}", pattern))?
+        .with_context(|| format!("failed to glob: {pattern}"))?
         .next()
         .ok_or_else(|| anyhow!("module not found: {}", module))?
         .context("glob error")?;
 
     output!(quiet, "loading module: {}", module_path.display());
-    let mut f =
-        File::open(&module_path).with_context(|| format!("open(): {}", module_path.display()))?;
-
-    let stat = f
-        .metadata()
-        .with_context(|| format!("stat(): {}", module_path.display()))?;
 
     let extension = module_path
         .as_path()
         .extension()
         .ok_or_else(|| anyhow!("module has no extension: {}", module_path.display()))?;
 
-    let contents = if extension == "xz" {
-        output!(quiet, "decompressing module");
-        let mut decompressed = Vec::with_capacity(stat.len() as usize * 2);
-        xz2::read::XzDecoder::new(f).read_to_end(&mut decompressed)?;
-        decompressed
-    } else {
-        let mut contents: Vec<u8> = Vec::with_capacity(stat.len() as usize);
-        f.read_to_end(&mut contents)?;
-        contents
-    };
+    let contents = read_to_end(&module_path, extension == "xz")
+        .with_context(|| format!("read_to_end({})", module_path.display()))?;
 
     if !contents.starts_with(&[0x7f, 0x45, 0x4c, 0x46]) {
         bail!("module is not an valid ELF file");
@@ -124,10 +106,10 @@ fn resolve_alias(quiet: bool, module_dir: &Path, name: &str) -> anyhow::Result<S
             }
             let alias = parts
                 .next()
-                .with_context(|| format!("alias line missing alias: {}", line))?;
+                .with_context(|| format!("alias line missing alias: {line}"))?;
             let module = parts
                 .next()
-                .with_context(|| format!("alias line missing module: {}", line))?;
+                .with_context(|| format!("alias line missing module: {line}"))?;
             if parts.next().is_some() {
                 bail!("alias line has too many parts: {}", line);
             }

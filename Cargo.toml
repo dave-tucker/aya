@@ -82,15 +82,14 @@ indoc = { version = "2.0", default-features = false }
 libc = { version = "0.2.105", default-features = false }
 log = { version = "0.4", default-features = false }
 netns-rs = { version = "0.1", default-features = false }
-network-types = { version = "0.0.7", default-features = false }
+network-types = { version = "0.0.8", default-features = false }
 nix = { version = "0.29.0", default-features = false }
 num_enum = { version = "0.7", default-features = false }
 object = { version = "0.36", default-features = false }
-octorust = { version = "0.10", default-features = false }
 once_cell = { version = "1.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 proc-macro2-diagnostics = { version = "0.10.1", default-features = false }
-public-api = { version = "0.44.0", default-features = false }
+public-api = { version = "0.47.0", default-features = false }
 quote = { version = "1", default-features = false }
 rand = { version = "0.9", default-features = false }
 rbpf = { version = "0.3.0", default-features = false }
@@ -115,11 +114,3 @@ unused_trait_names = "warn"
 
 [workspace.lints.rust]
 unused-extern-crates = "warn"
-
-[profile.release.package.integration-ebpf]
-codegen-units = 1
-debug = 2
-
-[patch.crates-io]
-# TODO: Remove when https://github.com/rust-random/getrandom/commit/b75db5cede302bc9734f5bf2b9048a6e05c7f11e appears in a release.
-getrandom = { git = "https://github.com/rust-random/getrandom.git", rev = "b75db5cede302bc9734f5bf2b9048a6e05c7f11e" }
