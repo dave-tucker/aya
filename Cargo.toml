@@ -62,13 +62,13 @@ anyhow = { version = "1", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 assert_matches = { version = "1.5.0", default-features = false }
 async-io = { version = "2.0", default-features = false }
-bindgen = { version = "0.71", default-features = false }
+bindgen = { version = "0.72", default-features = false }
 bitflags = { version = "2.2.1", default-features = false }
 bytes = { version = "1", default-features = false }
-cargo_metadata = { version = "0.19.0", default-features = false }
+cargo_metadata = { version = "0.22.0", default-features = false }
 clap = { version = "4", default-features = false }
 const-assert = { version = "1.0.1", default-features = false }
-dialoguer = { version = "0.11", default-features = false }
+dialoguer = { version = "0.12", default-features = false }
 diff = { version = "0.1.13", default-features = false }
 env_logger = { version = "0.11", default-features = false }
 epoll = { version = "4.3.3", default-features = false }
@@ -78,16 +78,16 @@ indoc = { version = "2.0", default-features = false }
 libc = { version = "0.2.105", default-features = false }
 log = { version = "0.4", default-features = false }
 netns-rs = { version = "0.1", default-features = false }
-nix = { version = "0.29.0", default-features = false }
+nix = { version = "0.30.1", default-features = false }
 num_enum = { version = "0.7", default-features = false }
-object = { version = "0.36", default-features = false }
-octorust = { version = "0.9.0", default-features = false }
+object = { version = "0.37", default-features = false }
+octorust = { version = "0.10.0", default-features = false }
 once_cell = { version = "1.20.1", default-features = false }
 proc-macro2 = { version = "1", default-features = false }
 proc-macro2-diagnostics = { version = "0.10.1", default-features = false }
-public-api = { version = "0.43.0", default-features = false }
+public-api = { version = "0.50.1", default-features = false }
 quote = { version = "1", default-features = false }
-rand = { version = "0.8", default-features = false }
+rand = { version = "0.9", default-features = false }
 rbpf = { version = "0.3.0", default-features = false }
 rustdoc-json = { version = "0.9.0", default-features = false }
 rustup-toolchain = { version = "0.1.5", default-features = false }
@@ -99,7 +99,7 @@ test-log = { version = "0.2.13", default-features = false }
 testing_logger = { version = "0.1.1", default-features = false }
 thiserror = { version = "2.0.3", default-features = false }
 tokio = { version = "1.24.0", default-features = false }
-which = { version = "7.0.0", default-features = false }
+which = { version = "8.0.0", default-features = false }
 xdpilone = { version = "1.0.5", default-features = false }
 
 [profile.release.package.integration-ebpf]
